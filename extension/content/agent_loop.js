@@ -1,0 +1,309 @@
+// The ReAct-style control loop: serialize DOM -> ask the local LLM for one
+// JSON action -> animate the pointer -> execute the action -> repeat.
+(function () {
+  const PA = (window.__PA_AGENT__ = window.__PA_AGENT__ || {});
+
+  const ACTION_SCHEMA_DOC = `Reponds STRICTEMENT avec un unique objet JSON (pas de markdown, pas de texte autour), au format exact:
+{
+  "thought": "raisonnement bref sur la prochaine etape",
+  "memory": "resume court de ce qu'il faut retenir pour la suite (peut rester identique)",
+  "action": {
+    "type": "click" | "type" | "select" | "scroll" | "press_key" | "wait" | "read_text" | "ask_user" | "finish",
+    "index": 0,
+    "text": "texte a saisir (pour type)",
+    "enter": false,
+    "value": "valeur ou libelle de l'option (pour select)",
+    "direction": "down",
+    "amount": "page",
+    "key": "Enter",
+    "ms": 800,
+    "question": "question posee a l'utilisateur (pour ask_user)",
+    "success": true,
+    "message": "message final ou question (pour finish/ask_user)"
+  }
+}
+N'inclus que les champs pertinents pour le type d'action choisi. "index" fait reference au numero entre crochets [N] devant chaque element interactif listé.`;
+
+  function systemPrompt(language) {
+    return `Tu es un agent qui pilote un navigateur web pour accomplir un objectif donne par l'utilisateur, en observant une representation textuelle simplifiee de la page (elements interactifs numerotes [0], [1], ...).
+Regles:
+- Une seule action a la fois. Observe le resultat avant de continuer.
+- Utilise "scroll" pour reveler des elements qui ne sont pas dans la liste actuelle.
+- Utilise "read_text" pour lire le texte principal de la page (article, contenu editorial) quand l'objectif est de resumer, repondre a une question sur le contenu, ou extraire une information textuelle. Cette action renvoie tout le texte principal en un coup, inutile de scroller pour "trouver du contenu a lire".
+- Utilise "ask_user" si tu as besoin d'une information que seul l'utilisateur possede (mot de passe, choix ambigu, confirmation sensible), et attends sa reponse.
+- Utilise "finish" des que l'objectif est atteint, ou si tu es bloque apres plusieurs tentatives (success=false et explique pourquoi).
+- Ne jamais inventer un index qui n'est pas dans la liste fournie.
+- Certains elements peuvent provenir d'un iframe (marque par une ligne "-- iframe ... --" dans la liste) : ils s'utilisent exactement comme les autres, par leur numero.
+- Reponds toujours dans la langue: ${language || 'fr-FR'}.
+${ACTION_SCHEMA_DOC}`;
+  }
+
+  function extractJson(text) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        try { return JSON.parse(match[0]); } catch { /* fall through */ }
+      }
+      return null;
+    }
+  }
+
+  function wait(ms) {
+    return new Promise((r) => setTimeout(r, Math.min(Math.max(ms || 0, 0), 8000)));
+  }
+
+  function nativeSetValue(el, value) {
+    const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) setter.call(el, value); else el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function dispatchKey(el, key) {
+    const opts = { key, code: key, bubbles: true, cancelable: true };
+    el.dispatchEvent(new KeyboardEvent('keydown', opts));
+    el.dispatchEvent(new KeyboardEvent('keypress', opts));
+    el.dispatchEvent(new KeyboardEvent('keyup', opts));
+  }
+
+  // Actions that target a specific indexed element. Runs in whichever frame
+  // (top or same-page iframe) actually owns that element's local index.
+  async function executeLocalIndexed(action) {
+    const { type } = action;
+    if (type === 'click') {
+      const el = PA.dom.getElementByIndex(action.index);
+      if (!el) return { ok: false, text: `Index ${action.index} introuvable.` };
+      await PA.pointer.actOn(el, { click: true });
+      el.click();
+      await wait(350);
+      return { ok: true, text: `Clic effectue sur [${action.index}].` };
+    }
+    if (type === 'type') {
+      const el = PA.dom.getElementByIndex(action.index);
+      if (!el) return { ok: false, text: `Index ${action.index} introuvable.` };
+      await PA.pointer.actOn(el);
+      el.focus();
+      if (el.isContentEditable) {
+        el.textContent = action.text ?? '';
+        el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      } else {
+        nativeSetValue(el, action.text ?? '');
+      }
+      if (action.enter) {
+        await wait(120);
+        dispatchKey(el, 'Enter');
+      }
+      await wait(200);
+      return { ok: true, text: `Texte saisi dans [${action.index}]${action.enter ? ' puis Entree' : ''}.` };
+    }
+    if (type === 'select') {
+      const el = PA.dom.getElementByIndex(action.index);
+      if (!el || el.tagName !== 'SELECT') return { ok: false, text: `Index ${action.index} n'est pas un select.` };
+      await PA.pointer.actOn(el, { click: true });
+      const opt = Array.from(el.options).find(
+        (o) => o.value === action.value || o.textContent.trim() === String(action.value).trim()
+      );
+      if (!opt) return { ok: false, text: `Option "${action.value}" introuvable dans [${action.index}].` };
+      el.value = opt.value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      await wait(200);
+      return { ok: true, text: `Option "${opt.textContent.trim()}" selectionnee dans [${action.index}].` };
+    }
+    return { ok: false, text: `Type d'action indexee inconnu: ${type}` };
+  }
+
+  // Page-level actions with no element index: always run in the top frame.
+  async function executeGlobal(action) {
+    const { type } = action;
+    if (type === 'scroll') {
+      const amount = action.amount === 'small' ? 320 : Math.round(innerHeight * 0.85);
+      const delta = action.direction === 'up' ? -amount : amount;
+      const before = scrollY;
+      scrollBy({ top: delta, behavior: 'smooth' });
+      await wait(450);
+      const moved = Math.abs(scrollY - before) > 2;
+      const dirLabel = action.direction === 'up' ? 'vers le haut' : 'vers le bas';
+      if (!moved) {
+        const atLimit = action.direction === 'up' ? 'en haut' : 'en bas';
+        return {
+          ok: true,
+          text: `Defilement ${dirLabel} sans effet: la page est deja tout ${atLimit} (fin de page atteinte). Inutile de continuer a scroller dans cette direction, cherche une autre approche.`,
+        };
+      }
+      return { ok: true, text: `Defilement ${dirLabel} effectue.` };
+    }
+    if (type === 'press_key') {
+      const target = document.activeElement || document.body;
+      dispatchKey(target, action.key || 'Enter');
+      await wait(200);
+      return { ok: true, text: `Touche "${action.key}" envoyee.` };
+    }
+    if (type === 'wait') {
+      await wait(action.ms || 500);
+      return { ok: true, text: `Attente de ${action.ms || 500} ms.` };
+    }
+    if (type === 'read_text') {
+      const text = PA.dom.extractMainText();
+      return { ok: true, text: `Texte principal de la page:\n${text}` };
+    }
+    return { ok: false, text: `Type d'action inconnu: ${type}` };
+  }
+
+  const INDEXED_TYPES = new Set(['click', 'type', 'select']);
+
+  // Routes an action to wherever it needs to run: locally, in a same-page
+  // iframe (via frame_bridge), or as a top-frame page-level action.
+  async function dispatch(action, routes) {
+    if (!INDEXED_TYPES.has(action.type)) return executeGlobal(action);
+    const route = routes && routes[action.index];
+    if (!route) return { ok: false, text: `Index ${action.index} introuvable.` };
+    if (route.local) return executeLocalIndexed({ ...action, index: route.index });
+    // Generous timeout: the target frame animates the pointer (highlight +
+    // move + optional ripple) before executing, which alone takes ~650ms.
+    const res = await PA.frames.requestFrame(
+      route.frameWindow,
+      'EXEC_REQUEST',
+      { action: { ...action, index: route.index } },
+      6000
+    );
+    if (!res) return { ok: false, text: `Le cadre (iframe) contenant [${action.index}] n'a pas repondu a temps.` };
+    return res.result;
+  }
+
+  PA.actions = { executeLocalIndexed, executeGlobal };
+
+  function chat(messages, settings) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: 'CHAT', messages, baseUrl: settings.baseUrl, model: settings.model },
+        (res) => {
+          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          if (!res || !res.ok) return reject(new Error(res?.error || 'Erreur inconnue lors de l\'appel a Ollama.'));
+          resolve(res.content);
+        }
+      );
+    });
+  }
+
+  function createController({ onThought, onActionResult, onError, onFinish, onAskUser, onStep, onPersist }) {
+    let stopped = false;
+    let currentGoal = '';
+    let memory = '';
+
+    async function step(settings, lastResult, stepNum, historyBlock) {
+      const { lines, routes } = await PA.frames.collectAll();
+      const domSnapshot = `${PA.dom.header()}\n${lines.length ? lines.join('\n') : '(aucun element interactif visible dans le viewport actuel)'}`;
+      const userMsgParts = [];
+      if (historyBlock) userMsgParts.push(historyBlock, '');
+      userMsgParts.push(
+        `Objectif: ${currentGoal}`,
+        `Etape: ${stepNum}/${settings.maxSteps}`,
+        `Memoire: ${memory || '(vide)'}`,
+        `Resultat de l'action precedente: ${lastResult || '(aucune action encore)'}`,
+        '',
+        domSnapshot,
+      );
+      const userMsg = userMsgParts.join('\n');
+
+      const messages = [
+        { role: 'system', content: systemPrompt(settings.language) },
+        { role: 'user', content: userMsg },
+      ];
+
+      let raw = await chat(messages, settings);
+      let parsed = extractJson(raw);
+      if (!parsed || !parsed.action) {
+        messages.push({ role: 'assistant', content: raw });
+        messages.push({
+          role: 'user',
+          content: 'Ta reponse precedente n\'etait pas un JSON valide selon le schema demande. Reponds uniquement avec le JSON.',
+        });
+        raw = await chat(messages, settings);
+        parsed = extractJson(raw);
+      }
+      if (!parsed || !parsed.action) {
+        throw new Error('Le modele n\'a pas renvoye un JSON exploitable: ' + raw.slice(0, 200));
+      }
+      return { parsed, routes };
+    }
+
+    function actionSignature(action) {
+      return JSON.stringify([action.type, action.index, action.direction, action.value, (action.text || '').slice(0, 30)]);
+    }
+
+    async function run(goal, settings, resumeState, historyBlock) {
+      stopped = false;
+      currentGoal = goal;
+      memory = resumeState?.memory || '';
+      let lastResult = resumeState?.lastResult || '';
+      let stepNum = resumeState?.stepNum || 1;
+      let lastActionSignature = null;
+      let repeatCount = 0;
+
+      while (!stopped && stepNum <= settings.maxSteps) {
+        onStep && onStep(stepNum, settings.maxSteps);
+        let parsed, routes;
+        try {
+          ({ parsed, routes } = await step(settings, lastResult, stepNum, historyBlock));
+        } catch (e) {
+          onError && onError(e.message || String(e));
+          return;
+        }
+        if (stopped) return;
+
+        if (parsed.thought) onThought && onThought(parsed.thought);
+        if (parsed.memory) memory = parsed.memory;
+
+        const action = parsed.action || {};
+        if (action.type === 'finish') {
+          onFinish && onFinish({ success: action.success !== false, message: action.message || '' });
+          return;
+        }
+        if (action.type === 'ask_user') {
+          const answer = await (onAskUser ? onAskUser(action.question || action.message || 'Une precision ?') : Promise.resolve(''));
+          if (stopped) return;
+          lastResult = `L'utilisateur repond a la question "${action.question || ''}": ${answer}`;
+          stepNum += 1;
+          onPersist && onPersist(getState(lastResult, stepNum));
+          continue;
+        }
+
+        let result;
+        try {
+          result = await dispatch(action, routes);
+        } catch (e) {
+          result = { ok: false, text: 'Erreur lors de l\'execution: ' + (e.message || String(e)) };
+        }
+        onActionResult && onActionResult(action, result);
+
+        const sig = actionSignature(action);
+        repeatCount = sig === lastActionSignature ? repeatCount + 1 : 1;
+        lastActionSignature = sig;
+        lastResult = result.text;
+        if (repeatCount >= 3) {
+          lastResult += ` ATTENTION: tu repetes exactement la meme action depuis ${repeatCount} etapes sans progres visible. N'y reviens pas: essaie une approche differente, ou conclus avec "finish" (success=false) en expliquant le blocage.`;
+        }
+        stepNum += 1;
+        onPersist && onPersist(getState(lastResult, stepNum));
+      }
+      if (!stopped) {
+        onFinish && onFinish({ success: false, message: 'Nombre maximum d\'etapes atteint sans conclusion.' });
+      }
+    }
+
+    function stop() {
+      stopped = true;
+    }
+
+    function getState(lastResult, stepNum) {
+      return { goal: currentGoal, memory, lastResult, stepNum };
+    }
+
+    return { run, stop, getState };
+  }
+
+  PA.agent = { createController };
+})();

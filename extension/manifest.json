@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Ollama Page Agent",
+  "version": "0.1.0",
+  "description": "Pilote n'importe quelle page web en langage naturel via un modele Ollama local (clone de page-agent).",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "optional_host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "popup/popup.html",
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "all_frames": true,
+      "js": [
+        "content/dom_serializer.js",
+        "content/pointer.js",
+        "content/widget.js",
+        "content/agent_loop.js",
+        "content/frame_bridge.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
