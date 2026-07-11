@@ -1,20 +1,34 @@
 # Ollama Page Agent
 
-Clone maison de [page-agent](https://github.com/alibaba/page-agent) (le bookmarklet/script que tu as etudie), sous forme d'extension Chrome, branche sur un serveur **Ollama local** au lieu d'une API cloud.
+🇫🇷 [Français](#français) · 🇬🇧 [English](#english)
 
-Meme principe : le DOM de la page est transforme en une liste texte d'elements interactifs numerotes (`[0]`, `[1]`, ...), envoyee a un LLM avec ton objectif en langage naturel. Le modele repond avec une action JSON (`click`, `type`, `select`, `scroll`, ...), qui est executee dans la page pendant qu'un curseur visuel se deplace et clique a l'ecran pour que tu voies ce qui se passe.
+---
 
-Tout tourne en local : aucune donnee de page n'est envoyee ailleurs qu'a ton propre Ollama.
+## Français
 
-## Installation
+### Origine du projet
 
-### 1. Ollama
+Ce projet est une réimplémentation indépendante, inspirée de **[page-agent](https://github.com/alibaba/page-agent)** d'Alibaba (package npm [`page-agent`](https://www.npmjs.com/package/page-agent), licence MIT, © SimonLuvRamen et Alibaba Group Holding Limited) — un agent JavaScript "in-page" qui pilote une interface web en langage naturel via une perception textuelle du DOM (pas de captures d'écran, pas de modèle vision). Le point de départ concret a été [ce bookmarklet de démo](https://cdn.jsdelivr.net/npm/page-agent@1.5.7/dist/iife/page-agent.demo.js), étudié pour en comprendre l'architecture (perception DOM indexée, boucle d'actions JSON, LLM "bring your own").
+
+**Ollama Page Agent** en reprend l'idée générale — DOM sérialisé en éléments interactifs numérotés, boucle d'actions JSON exécutées dans la page — mais avec un code entièrement réécrit, sous forme d'**extension Chrome (Manifest V3)**, branché sur un **modèle Ollama local** plutôt qu'une API cloud, avec en plus : un curseur visuel animé, un widget de chat flottant, le support des iframes, un historique persistant par site, et la reprise de tâche après navigation.
+
+Aucune ligne de code de page-agent n'a été copiée ; seule l'approche architecturale documentée publiquement a servi d'inspiration.
+
+### Comment ça marche
+
+Le DOM de la page est transformé en une liste texte d'éléments interactifs numérotés (`[0]`, `[1]`, ...), envoyée à un LLM local avec ton objectif en langage naturel. Le modèle répond avec une action JSON (`click`, `type`, `select`, `scroll`, `read_text`, ...), exécutée dans la page pendant qu'un curseur visuel se déplace et clique à l'écran pour que tu voies ce qui se passe.
+
+Tout tourne en local : aucune donnée de page n'est envoyée ailleurs qu'à ton propre serveur Ollama.
+
+### Installation
+
+#### 1. Ollama
 
 ```
 ollama pull qwen2.5:7b-instruct      # ou llama3.1:8b, mistral-nemo, etc.
 ```
 
-Autorise l'extension a appeler Ollama en definissant la variable d'environnement **avant** de lancer le serveur (sinon Ollama bloque la requete en CORS) :
+Autorise l'extension à appeler Ollama en définissant la variable d'environnement **avant** de lancer le serveur (sinon Ollama bloque la requête en CORS) :
 
 ```
 # Windows (PowerShell)
@@ -25,47 +39,143 @@ ollama serve
 OLLAMA_ORIGINS="chrome-extension://*" ollama serve
 ```
 
-Choisis un modele avec de bonnes capacites d'instruction-following et de sortie JSON. Les tres petits modeles (<3B) suivent mal le format et bloquent la boucle.
+Si tu utilises l'appli de bureau Ollama (icône dans la zone de notification), il faut la quitter complètement puis la relancer après avoir défini la variable pour qu'elle en tienne compte.
 
-### 2. L'extension
+Choisis un modèle avec de bonnes capacités d'instruction-following et de sortie JSON. Les très petits modèles (< 3B) suivent mal le format et bloquent la boucle.
+
+#### 2. L'extension
 
 1. Ouvre `chrome://extensions`
-2. Active le **mode developpeur** (en haut a droite)
-3. Clique **Charger l'extension non empaquetee**
-4. Selectionne le dossier `extension/` de ce depot
+2. Active le **mode développeur** (en haut à droite)
+3. Clique **Charger l'extension non empaquetée**
+4. Sélectionne le dossier `extension/` de ce dépôt
 
-### 3. Configuration
+#### 3. Configuration
 
-Clique sur l'icone de l'extension dans la barre d'outils (ou l'engrenage du widget flottant) :
+Clique sur l'icône de l'extension dans la barre d'outils (ou l'engrenage du widget flottant) :
 
-1. Verifie l'adresse du serveur (`http://localhost:11434` par defaut)
-2. Clique **Autoriser** pour donner a l'extension la permission Chrome d'appeler cette adresse
-3. Choisis un modele dans la liste (rafraichie automatiquement depuis `/api/tags`)
+1. Vérifie l'adresse du serveur (`http://localhost:11434` par défaut)
+2. Clique **Autoriser** pour donner à l'extension la permission Chrome d'appeler cette adresse
+3. Choisis un modèle dans la liste (rafraîchie automatiquement depuis `/api/tags`)
 4. Enregistre
 
-## Utilisation
+### Utilisation
 
-Sur n'importe quelle page, une bulle 🤖 apparait en bas a droite. Clique dessus, tape ton objectif ("remplis le formulaire de contact avec mon nom Jean Dupont", "trouve le lien de desabonnement et clique dessus", ...) et lance.
+Sur n'importe quelle page, une bulle 🤖 apparaît en bas à droite. Clique dessus, tape ton objectif ("remplis le formulaire de contact avec mon nom Jean Dupont", "résume-moi cet article", "trouve le lien de désabonnement et clique dessus", ...) et lance.
 
-Le panneau affiche en temps reel les pensees du modele et les actions executees, pendant que le curseur visuel se deplace sur la page. La tache survit a une navigation (changement de page) : elle reprend automatiquement avec sa memoire si le modele a clique un lien.
+Le panneau affiche en temps réel les pensées du modèle et les actions exécutées, pendant que le curseur visuel se déplace sur la page. Deux boutons dans l'en-tête donnent accès à l'historique des tâches passées sur ce site (🕘) et permettent de le vider (🗑). La tâche survit à une navigation (changement de page) : elle reprend automatiquement avec sa mémoire si le modèle a cliqué un lien. Les éléments situés dans des iframes de la page sont aussi détectés et pilotables.
 
-## Structure
+### Structure
 
 ```
 extension/
-  manifest.json          # MV3
-  background.js           # pont vers l'API Ollama (/api/chat, /api/tags), permissions, session
+  manifest.json           # MV3, all_frames actif
+  background.js            # pont vers l'API Ollama (/api/chat, /api/tags), permissions, session
   content/
-    dom_serializer.js     # DOM -> texte indexe pour le LLM
-    pointer.js             # curseur visuel + surlignage + ripple de clic
-    widget.js               # panneau de chat flottant (shadow DOM)
-    agent_loop.js          # boucle ReAct: prompt -> JSON action -> execution
-    content.js              # colle le tout, gere la reprise de session
-  popup/                    # reglages (aussi utilise comme page d'options)
+    dom_serializer.js      # DOM -> texte indexe pour le LLM (+ extraction de texte principal)
+    pointer.js              # curseur visuel + surlignage + ripple de clic
+    widget.js                # panneau de chat flottant (shadow DOM), historique
+    agent_loop.js           # boucle ReAct: prompt -> JSON action -> execution, anti-boucle
+    frame_bridge.js         # fusionne/route les elements entre cadre principal et iframes
+    content.js               # colle le tout, gere session + historique par site
+  popup/                     # reglages (aussi utilise comme page d'options)
 ```
 
-## Limites connues
+### Limites connues
 
-- Depend fortement de la capacite du modele local a repondre en JSON valide et a raisonner sur des listes d'elements ; prefere des modeles 7B+ instruct.
-- Ne fonctionne pas dans les iframes cross-origin, ni sur `chrome://` et les pages du Web Store.
-- Un site avec une CSP tres stricte peut bloquer certaines interactions synthetiques (rare).
+- Dépend fortement de la capacité du modèle local à répondre en JSON valide et à raisonner sur des listes d'éléments ; préfère des modèles 7B+ instruct.
+- Ne fonctionne pas sur `chrome://`, les pages du Web Store, ni les fichiers locaux `file://`.
+- Un site avec une CSP très stricte peut bloquer certaines interactions synthétiques (rare).
+
+### Licence
+
+MIT — voir [LICENSE](LICENSE).
+
+---
+
+## English
+
+### Origin
+
+This project is an independent reimplementation inspired by **[page-agent](https://github.com/alibaba/page-agent)** by Alibaba (npm package [`page-agent`](https://www.npmjs.com/package/page-agent), MIT license, © SimonLuvRamen and Alibaba Group Holding Limited) — an in-page JavaScript agent that controls a web UI in natural language through text-based DOM perception (no screenshots, no vision model). The concrete starting point was [this demo bookmarklet](https://cdn.jsdelivr.net/npm/page-agent@1.5.7/dist/iife/page-agent.demo.js), studied to understand its architecture (indexed DOM perception, JSON action loop, bring-your-own LLM).
+
+**Ollama Page Agent** reuses the general idea — DOM serialized into numbered interactive elements, a loop of JSON actions executed on the page — but with entirely rewritten code, packaged as a **Chrome extension (Manifest V3)**, wired to a **local Ollama model** instead of a cloud API, plus: an animated visual pointer, a floating chat widget, iframe support, persistent per-site history, and task resumption across navigation.
+
+No page-agent code was copied; only the publicly documented architectural approach served as inspiration.
+
+### How it works
+
+The page's DOM is turned into a numbered text list of interactive elements (`[0]`, `[1]`, ...), sent to a local LLM along with your natural-language goal. The model replies with one JSON action (`click`, `type`, `select`, `scroll`, `read_text`, ...), executed on the page while a visual cursor moves and clicks on screen so you can see what's happening.
+
+Everything runs locally: no page data is ever sent anywhere except your own Ollama server.
+
+### Installation
+
+#### 1. Ollama
+
+```
+ollama pull qwen2.5:7b-instruct      # or llama3.1:8b, mistral-nemo, etc.
+```
+
+Allow the extension to call Ollama by setting this environment variable **before** starting the server (otherwise Ollama rejects the request with a CORS error):
+
+```
+# Windows (PowerShell)
+$env:OLLAMA_ORIGINS = "chrome-extension://*"
+ollama serve
+
+# macOS / Linux
+OLLAMA_ORIGINS="chrome-extension://*" ollama serve
+```
+
+If you use the Ollama desktop app (tray icon), fully quit it and relaunch after setting the variable so it picks it up.
+
+Pick a model with decent instruction-following and JSON-output ability. Very small models (< 3B) struggle with the format and stall the loop.
+
+#### 2. The extension
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode** (top right)
+3. Click **Load unpacked**
+4. Select this repo's `extension/` folder
+
+#### 3. Configuration
+
+Click the extension's toolbar icon (or the gear icon in the floating widget):
+
+1. Check the server address (`http://localhost:11434` by default)
+2. Click **Authorize** to grant the extension Chrome permission to call that address
+3. Pick a model from the list (auto-refreshed from `/api/tags`)
+4. Save
+
+### Usage
+
+On any page, a 🤖 bubble appears bottom-right. Click it, type your goal ("fill the contact form with my name John Doe", "summarize this article", "find the unsubscribe link and click it", ...) and launch.
+
+The panel shows the model's reasoning and executed actions live, while the visual cursor moves across the page. Two header buttons give access to this site's task history (🕘) and let you clear it (🗑). A task survives a navigation (page change): it automatically resumes with its memory if the model clicked a link. Elements inside same-page iframes are also detected and controllable.
+
+### Structure
+
+```
+extension/
+  manifest.json           # MV3, all_frames enabled
+  background.js            # bridge to the Ollama API (/api/chat, /api/tags), permissions, session
+  content/
+    dom_serializer.js      # DOM -> indexed text for the LLM (+ main text extraction)
+    pointer.js              # visual cursor + highlight + click ripple
+    widget.js                # floating chat panel (shadow DOM), history
+    agent_loop.js           # ReAct loop: prompt -> JSON action -> execution, loop guard
+    frame_bridge.js         # merges/routes elements between the top frame and iframes
+    content.js               # wires it all together, session + per-site history
+  popup/                     # settings (also used as the options page)
+```
+
+### Known limitations
+
+- Heavily depends on the local model's ability to reply with valid JSON and reason over element lists; prefer 7B+ instruct models.
+- Doesn't work on `chrome://` pages, the Web Store, or local `file://` files.
+- A site with a very strict CSP may block some synthetic interactions (rare).
+
+### License
+
+MIT — see [LICENSE](LICENSE).
