@@ -35,6 +35,7 @@ N'inclus que les champs pertinents pour le type d'action choisi. "index" fait re
 Regles:
 - Une seule action a la fois. Observe le resultat avant de continuer.
 - Utilise "scroll" pour reveler des elements qui ne sont pas dans la liste actuelle.
+- Quand il faut taper du texte PUIS valider immediatement (envoyer un message, valider un champ de recherche), utilise une seule action "type" avec "enter": true plutot que deux actions separees ("type" puis "press_key"): entre deux etapes distinctes, le focus peut deriver ailleurs sur la page et la validation echoue silencieusement.
 - Utilise "read_text" pour lire le texte principal de la page (article, contenu editorial) quand l'objectif est de resumer, repondre a une question sur le contenu, ou extraire une information textuelle. Cette action renvoie tout le texte principal en un coup, inutile de scroller pour "trouver du contenu a lire".
 - Utilise "ask_user" si tu as besoin d'une information que seul l'utilisateur possede (mot de passe, choix ambigu, confirmation sensible), et attends sa reponse.
 - Utilise "finish" des que l'objectif est atteint, ou si tu es bloque apres plusieurs tentatives (success=false et explique pourquoi).
@@ -134,6 +135,12 @@ ${ACTION_SCHEMA_DOC}${customBlock}`;
     }
   }
 
+  // Remembers the last element we typed into, so a later, separate
+  // "press_key Enter" can re-focus it if focus silently drifted away in the
+  // meantime (a full Ollama round-trip happens between two agent steps,
+  // plenty of time for a rich editor's re-render to move focus elsewhere).
+  let lastTypedElement = null;
+
   // Actions that target a specific indexed element. Runs in whichever frame
   // (top or same-page iframe) actually owns that element's local index.
   async function executeLocalIndexed(action) {
@@ -151,6 +158,7 @@ ${ACTION_SCHEMA_DOC}${customBlock}`;
       if (!el) return { ok: false, text: `Index ${action.index} introuvable.` };
       await PA.pointer.actOn(el);
       el.focus();
+      lastTypedElement = el;
       if (el.isContentEditable) {
         insertIntoContentEditable(el, action.text);
       } else {
@@ -200,10 +208,22 @@ ${ACTION_SCHEMA_DOC}${customBlock}`;
       return { ok: true, text: `Defilement ${dirLabel} effectue.` };
     }
     if (type === 'press_key') {
-      const target = document.activeElement || document.body;
+      let target = document.activeElement || document.body;
+      const looksEditable = target && (
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      );
+      let refocused = false;
+      if (!looksEditable && lastTypedElement && lastTypedElement.isConnected) {
+        lastTypedElement.focus();
+        target = lastTypedElement;
+        refocused = true;
+      }
       dispatchKey(target, action.key || 'Enter');
       await wait(200);
-      return { ok: true, text: `Touche "${action.key}" envoyee.` };
+      return {
+        ok: true,
+        text: `Touche "${action.key}" envoyee${refocused ? ' (focus avait derive, re-focalise sur le dernier champ saisi avant d\'envoyer la touche)' : ''}.`,
+      };
     }
     if (type === 'wait') {
       await wait(action.ms || 500);
