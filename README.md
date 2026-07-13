@@ -77,7 +77,9 @@ Cette option est **désactivée par défaut** : sans elle, tout fonctionne exact
 
 ### Confirmation avant une action sensible
 
-Avant tout **clic** sur un élément dont le libellé contient un mot-clé jugé sensible (publier, tweeter, envoyer, répondre, payer, acheter, commander, confirmer, valider, supprimer, se désabonner, ...), l'agent s'arrête et affiche une demande de confirmation dans le panneau (boutons **Confirmer** / **Annuler**) au lieu d'exécuter le clic directement. Si tu annules, l'agent en est informé et doit trouver une autre approche ou conclure. Cette détection se fait par mots-clés sur le texte visible du bouton : elle est volontairement large (elle peut se déclencher sur un simple bandeau de cookies) plutôt que de risquer de laisser passer une vraie action irréversible (publication publique, achat, suppression).
+Avant tout **clic** sur un élément dont le libellé contient un mot-clé jugé sensible (publier, tweeter, envoyer, répondre, payer, acheter, commander, confirmer, valider, supprimer, se désabonner, ...), l'agent s'arrête et affiche une demande de confirmation dans le panneau (**Confirmer** / **Toujours (cette page)** / **Annuler**) au lieu d'exécuter le clic directement. Si tu annules, l'agent en est informé et doit trouver une autre approche ou conclure. Cette détection se fait par mots-clés sur le texte visible du bouton : elle est volontairement large (elle peut se déclencher sur un simple bandeau de cookies) plutôt que de risquer de laisser passer une vraie action irréversible (publication publique, achat, suppression).
+
+**Toujours (cette page)** arrête de redemander pour le reste de la page en cours (remis à zéro au prochain chargement de page). Dans les réglages, le mode **"Confirmation avant une action sensible"** peut aussi être basculé sur **"Ne jamais demander (auto)"** pour désactiver complètement ce garde-fou — à réserver à un usage encadré, puisque ça retire la protection contre les actions irréversibles.
 
 ### Instructions personnalisées
 
@@ -184,7 +186,9 @@ This option is **off by default**: without it, everything works exactly as befor
 
 ### Confirmation before a sensitive action
 
-Before any **click** on an element whose label contains a keyword considered sensitive (publish, tweet, send, reply, pay, buy, order, confirm, submit, delete, unsubscribe, ...), the agent stops and shows a confirmation prompt in the panel (**Confirm** / **Cancel** buttons) instead of executing the click directly. If you cancel, the agent is told and must find another approach or wrap up. This is a keyword-based heuristic on the button's visible text — deliberately broad (it can trigger on a plain cookie banner) rather than risk missing a real irreversible action (public post, purchase, deletion).
+Before any **click** on an element whose label contains a keyword considered sensitive (publish, tweet, send, reply, pay, buy, order, confirm, submit, delete, unsubscribe, ...), the agent stops and shows a confirmation prompt in the panel (**Confirm** / **Always (this page)** / **Cancel**) instead of executing the click directly. If you cancel, the agent is told and must find another approach or wrap up. This is a keyword-based heuristic on the button's visible text — deliberately broad (it can trigger on a plain cookie banner) rather than risk missing a real irreversible action (public post, purchase, deletion).
+
+**Always (this page)** stops asking for the rest of the current page (reset on the next page load). In settings, the **"Confirmation before a sensitive action"** mode can also be switched to **"Never ask (auto)"** to disable this safeguard entirely — reserve that for a supervised setup, since it removes the protection against irreversible actions.
 
 ### Custom instructions
 

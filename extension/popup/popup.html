@@ -62,6 +62,13 @@
     </div>
     <p class="hint" id="visionHint"></p>
 
+    <label>Confirmation avant une action sensible</label>
+    <select id="sensitiveActionMode">
+      <option value="ask">Toujours demander (recommande)</option>
+      <option value="auto">Ne jamais demander (auto)</option>
+    </select>
+    <p class="hint">En mode "Toujours demander", le prompt de confirmation propose aussi "Toujours pour cette page" pour ne plus etre redemande le temps de la page en cours.</p>
+
     <label>Instructions personnalisees (optionnel)</label>
     <textarea id="customInstructions" rows="4" placeholder="Ex: tutoie-moi, reponds avec humour, evite de cliquer sur les liens sponsorises..."></textarea>
     <p class="hint">Ajoutees a la suite des regles internes de l'agent (format d'action, etc.) sans les remplacer.</p>

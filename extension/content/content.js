@@ -7,6 +7,7 @@
 
   let controller = null;
   let pendingUserReply = null; // resolver for ask_user, set while awaiting
+  let autoApproveSensitive = false; // "toujours pour cette page" - resets on reload/navigation
 
   function sendMsg(message) {
     return new Promise((resolve, reject) => {
@@ -125,10 +126,12 @@
         sendMsg({ type: 'SET_SESSION', session: { running: true, goal, ...state } }).catch(() => {});
       },
       async onConfirmAction(label, detail) {
+        if (settings.sensitiveActionMode === 'auto' || autoApproveSensitive) return true;
         PA.widget.setStatus('idle');
-        const confirmed = await PA.widget.confirmAction(label, detail);
+        const choice = await PA.widget.confirmAction(label, detail);
         PA.widget.setStatus('running');
-        return confirmed;
+        if (choice === 'always') autoApproveSensitive = true;
+        return choice !== 'cancel';
       },
     });
 

@@ -95,6 +95,7 @@
       font-weight: 600; cursor: pointer;
     }
     .confirm-btn.yes { background: #f59e42; color: #201200; }
+    .confirm-btn.always { background: rgba(245,158,66,0.25); color: #ffdcae; border: 1px solid rgba(245,158,66,0.4); }
     .confirm-btn.no { background: rgba(255,255,255,0.1); color: #e7e9ee; }
     .confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .composer {
@@ -335,6 +336,8 @@
 
   // Pauses the run with an inline Confirm/Cancel prompt for a sensitive
   // action (publish, pay, delete, ...) instead of executing it blindly.
+  // Resolves to 'once' (run this action, ask again next time), 'always'
+  // (run it and stop asking for the rest of this page), or 'cancel'.
   function confirmAction(label, detail) {
     ensureInit();
     open();
@@ -344,22 +347,27 @@
       const sub = el('div', 'confirm-detail', detail || '');
       const btnRow = el('div', 'confirm-buttons');
       const yesBtn = el('button', 'confirm-btn yes', 'Confirmer');
+      const alwaysBtn = el('button', 'confirm-btn always', 'Toujours (cette page)');
       const noBtn = el('button', 'confirm-btn no', 'Annuler');
-      btnRow.append(yesBtn, noBtn);
+      btnRow.append(yesBtn, alwaysBtn, noBtn);
       wrap.append(text, sub, btnRow);
       els.log.appendChild(wrap);
       els.log.scrollTop = els.log.scrollHeight;
 
-      function finish(value) {
+      function finish(choice) {
         yesBtn.disabled = true;
+        alwaysBtn.disabled = true;
         noBtn.disabled = true;
-        text.textContent = value ? `✓ Action autorisee : "${label}"` : `✗ Action annulee : "${label}"`;
+        text.textContent = choice === 'cancel'
+          ? `✗ Action annulee : "${label}"`
+          : `✓ Action autorisee${choice === 'always' ? ' (toujours pour cette page)' : ''} : "${label}"`;
         sub.remove();
         btnRow.remove();
-        resolve(value);
+        resolve(choice);
       }
-      yesBtn.addEventListener('click', () => finish(true));
-      noBtn.addEventListener('click', () => finish(false));
+      yesBtn.addEventListener('click', () => finish('once'));
+      alwaysBtn.addEventListener('click', () => finish('always'));
+      noBtn.addEventListener('click', () => finish('cancel'));
     });
   }
 

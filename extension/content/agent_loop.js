@@ -104,11 +104,34 @@ ${ACTION_SCHEMA_DOC}${customBlock}`;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  const KEY_CODES = { Enter: 13, Escape: 27, Tab: 9, Backspace: 8 };
+
   function dispatchKey(el, key) {
-    const opts = { key, code: key, bubbles: true, cancelable: true };
+    const keyCode = KEY_CODES[key];
+    const opts = { key, code: key, keyCode, which: keyCode, bubbles: true, cancelable: true };
     el.dispatchEvent(new KeyboardEvent('keydown', opts));
     el.dispatchEvent(new KeyboardEvent('keypress', opts));
     el.dispatchEvent(new KeyboardEvent('keyup', opts));
+  }
+
+  // Rich-text editors (Slate/Draft.js/ProseMirror - Discord, X, Gmail...)
+  // keep their own internal document model in sync via native browser input
+  // events. Directly overwriting textContent bypasses that model entirely:
+  // the text is visible but the editor's state doesn't know about it, so
+  // "send on Enter" handlers see an empty message and silently no-op.
+  // execCommand('insertText') goes through the real text-insertion pipeline
+  // instead, which these editors are built to listen to.
+  function insertIntoContentEditable(el, text) {
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const ok = document.execCommand('insertText', false, text ?? '');
+    if (!ok) {
+      el.textContent = text ?? '';
+      el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    }
   }
 
   // Actions that target a specific indexed element. Runs in whichever frame
@@ -129,8 +152,7 @@ ${ACTION_SCHEMA_DOC}${customBlock}`;
       await PA.pointer.actOn(el);
       el.focus();
       if (el.isContentEditable) {
-        el.textContent = action.text ?? '';
-        el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        insertIntoContentEditable(el, action.text);
       } else {
         nativeSetValue(el, action.text ?? '');
       }

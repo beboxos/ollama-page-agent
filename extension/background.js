@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   temperature: 0.2,
   useVision: false,
   customInstructions: '',
+  sensitiveActionMode: 'ask', // 'ask' | 'auto'
 };
 
 async function getSettings() {
