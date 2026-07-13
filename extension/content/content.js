@@ -18,6 +18,18 @@
     });
   }
 
+  // Thrown/rejected whenever the extension was reloaded (chrome://extensions
+  // -> reload icon) while this page's content script - injected under the
+  // old instance - is still alive. Any chrome.* call from it fails this way;
+  // the only real fix is refreshing the page to get a fresh content script.
+  function friendlyError(msgOrErr) {
+    const msg = typeof msgOrErr === 'string' ? msgOrErr : (msgOrErr?.message || String(msgOrErr));
+    if (/Extension context invalidated/i.test(msg)) {
+      return "L'extension a ete rechargee/mise a jour depuis l'ouverture de cette page. Rafraichis la page (F5) pour continuer a utiliser l'agent.";
+    }
+    return msg;
+  }
+
   const DISABLED_SITES_KEY = 'pa_disabled_sites';
 
   async function isSiteDisabled() {
@@ -91,7 +103,7 @@
         PA.widget.log('action', `${describeAction(action)}\n${result.ok ? '✓' : '⚠'} ${preview}`);
       },
       onError(message) {
-        PA.widget.log('error', message);
+        PA.widget.log('error', friendlyError(message));
         PA.widget.setRunning(false);
         PA.widget.setStatus('error');
         PA.pointer.clear();
@@ -137,7 +149,7 @@
 
     const historyBlock = resumeState ? '' : formatHistoryForPrompt(await loadHistory());
     controller.run(goal, settings, resumeState, historyBlock).catch((e) => {
-      PA.widget.log('error', 'Erreur inattendue: ' + (e.message || String(e)));
+      PA.widget.log('error', 'Erreur inattendue: ' + friendlyError(e));
       PA.widget.setRunning(false);
       PA.widget.setStatus('error');
       PA.pointer.clear();
@@ -165,25 +177,37 @@
         PA.widget.log('system', `Tu: ${goal}`);
         return;
       }
-      startTask(goal);
+      startTask(goal).catch((e) => {
+        PA.widget.log('error', friendlyError(e));
+        PA.widget.setRunning(false);
+        PA.widget.setStatus('error');
+      });
     });
     PA.widget.onStop(stopTask);
     PA.widget.onHistory(async () => {
-      PA.widget.open();
-      const history = await loadHistory();
-      if (!history.length) {
-        PA.widget.log('system', 'Aucun historique enregistre pour ce site.');
-        return;
-      }
-      PA.widget.log('system', `Historique (${history.length}) pour ${location.hostname}:`);
-      for (const e of history) {
-        PA.widget.log('system', `[${e.date}] "${e.goal}" -> ${e.success ? '✓' : '✗'} ${e.message}`);
+      try {
+        PA.widget.open();
+        const history = await loadHistory();
+        if (!history.length) {
+          PA.widget.log('system', 'Aucun historique enregistre pour ce site.');
+          return;
+        }
+        PA.widget.log('system', `Historique (${history.length}) pour ${location.hostname}:`);
+        for (const e of history) {
+          PA.widget.log('system', `[${e.date}] "${e.goal}" -> ${e.success ? '✓' : '✗'} ${e.message}`);
+        }
+      } catch (e) {
+        PA.widget.log('error', friendlyError(e));
       }
     });
     PA.widget.onClearHistory(async () => {
-      if (!confirm("Vider l'historique enregistre pour ce site ?")) return;
-      await clearHistory();
-      PA.widget.log('system', 'Historique vide.');
+      try {
+        if (!confirm("Vider l'historique enregistre pour ce site ?")) return;
+        await clearHistory();
+        PA.widget.log('system', 'Historique vide.');
+      } catch (e) {
+        PA.widget.log('error', friendlyError(e));
+      }
     });
 
     try {

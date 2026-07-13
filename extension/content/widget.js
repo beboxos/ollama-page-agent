@@ -163,7 +163,7 @@
     closeBtn.title = 'Fermer';
     header.append(dot, title, historyBtn, clearHistoryBtn, settingsBtn, closeBtn);
 
-    const log = el('div', 'log');
+    const logEl = el('div', 'log');
 
     const composer = el('div', 'composer');
     const textarea = document.createElement('textarea');
@@ -173,7 +173,7 @@
 
     const hint = el('div', 'footer-hint', 'Modele local via Ollama - rien ne quitte ta machine.');
 
-    panel.append(header, log, composer, hint);
+    panel.append(header, logEl, composer, hint);
     shadow.append(style, bubble, panel);
     (document.documentElement || document.body).appendChild(host);
 
@@ -198,7 +198,11 @@
     });
     closeBtn.addEventListener('click', () => panel.classList.remove('open'));
     settingsBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
+      try {
+        chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
+      } catch {
+        log('error', "L'extension a ete rechargee/mise a jour depuis l'ouverture de cette page. Rafraichis la page (F5) pour continuer.");
+      }
     });
     historyBtn.addEventListener('click', () => handlers.history && handlers.history());
     clearHistoryBtn.addEventListener('click', () => handlers.clearHistory && handlers.clearHistory());
@@ -225,7 +229,7 @@
     });
     restorePositions(bubble, panel);
 
-    els = { bubble, panel, dot, log, textarea, runBtn };
+    els = { bubble, panel, dot, log: logEl, textarea, runBtn };
   }
 
   const POS_KEY_BUBBLE = 'pa_bubble_pos';
