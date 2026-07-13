@@ -132,16 +132,40 @@
     return indexMap[i];
   }
 
-  const MAIN_TEXT_MAX = 3000;
+  const MAIN_TEXT_MAX = 4000;
+
+  function cleanBlock(s) {
+    return (s || '').replace(/\n{3,}/g, '\n\n').trim();
+  }
 
   function extractMainText() {
+    // Feed/thread pages (X, Reddit, most comment sections, ...) repeat one
+    // <article> per post/comment: querySelector() alone would only ever
+    // return the first one, hiding every reply. Concatenate all of them
+    // instead when there's more than one on the page.
+    const articles = Array.from(document.querySelectorAll('article')).filter(
+      (el) => el.innerText && el.innerText.trim().length > 10
+    );
+    if (articles.length > 1) {
+      let combined = '';
+      for (let i = 0; i < articles.length; i++) {
+        const chunk = `--- element ${i + 1} ---\n${cleanBlock(articles[i].innerText)}\n`;
+        if (combined.length + chunk.length > MAIN_TEXT_MAX) {
+          combined += chunk.slice(0, Math.max(0, MAIN_TEXT_MAX - combined.length)) + '\n... [tronque]';
+          break;
+        }
+        combined += chunk;
+      }
+      return combined.trim() || '(aucun texte lisible trouve sur cette page)';
+    }
+
     let root = null;
     for (const sel of ['article', 'main', '[role="main"]']) {
       const el = document.querySelector(sel);
       if (el && el.innerText && el.innerText.trim().length > 200) { root = el; break; }
     }
     if (!root) root = document.body;
-    let text = (root.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+    let text = cleanBlock(root.innerText);
     if (text.length > MAIN_TEXT_MAX) text = text.slice(0, MAIN_TEXT_MAX) + '\n... [texte tronque]';
     return text || '(aucun texte lisible trouve sur cette page)';
   }

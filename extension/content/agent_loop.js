@@ -292,6 +292,7 @@ ${ACTION_SCHEMA_DOC}`;
       let stepNum = resumeState?.stepNum || 1;
       let lastActionSignature = null;
       let repeatCount = 0;
+      let lastReadTextResult = null;
 
       while (!stopped && stepNum <= settings.maxSteps) {
         onStep && onStep(stepNum, settings.maxSteps);
@@ -335,6 +336,12 @@ ${ACTION_SCHEMA_DOC}`;
         lastResult = result.text;
         if (repeatCount >= 3) {
           lastResult += ` ATTENTION: tu repetes exactement la meme action depuis ${repeatCount} etapes sans progres visible. N'y reviens pas: essaie une approche differente, ou conclus avec "finish" (success=false) en expliquant le blocage.`;
+        }
+        if (action.type === 'read_text' && result.ok) {
+          if (lastReadTextResult !== null && result.text === lastReadTextResult) {
+            lastResult += ' ATTENTION: ce texte est identique a la derniere lecture, il n\'y a rien de nouveau ici. Ne relis pas encore une fois: passe a une autre action (scroll, clic) ou conclus avec "finish".';
+          }
+          lastReadTextResult = result.text;
         }
         stepNum += 1;
         onPersist && onPersist(getState(lastResult, stepNum));
