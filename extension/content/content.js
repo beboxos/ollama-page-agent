@@ -93,12 +93,14 @@
         PA.widget.log('error', message);
         PA.widget.setRunning(false);
         PA.widget.setStatus('error');
+        PA.pointer.clear();
         sendMsg({ type: 'CLEAR_SESSION' }).catch(() => {});
       },
       onFinish({ success, message }) {
         PA.widget.log(success ? 'done' : 'error', message || (success ? 'Tache terminee.' : 'Tache interrompue.'));
         PA.widget.setRunning(false);
         PA.widget.setStatus(success ? 'done' : 'error');
+        PA.pointer.clear();
         sendMsg({ type: 'CLEAR_SESSION' }).catch(() => {});
         appendHistory({
           date: new Date().toLocaleString('fr-FR'),
@@ -135,6 +137,7 @@
       PA.widget.log('error', 'Erreur inattendue: ' + (e.message || String(e)));
       PA.widget.setRunning(false);
       PA.widget.setStatus('error');
+      PA.pointer.clear();
     });
   }
 
@@ -143,6 +146,7 @@
     if (pendingUserReply) pendingUserReply('(annule par l\'utilisateur)');
     PA.widget.setRunning(false);
     PA.widget.setStatus('idle');
+    PA.pointer.clear();
     PA.widget.log('system', 'Arrete par l\'utilisateur.');
     sendMsg({ type: 'CLEAR_SESSION' }).catch(() => {});
   }
