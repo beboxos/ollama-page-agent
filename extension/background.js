@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = {
   maxSteps: 20,
   temperature: 0.2,
   useVision: false,
+  customInstructions: '',
 };
 
 async function getSettings() {

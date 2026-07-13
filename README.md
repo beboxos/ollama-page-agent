@@ -79,6 +79,10 @@ Cette option est **désactivée par défaut** : sans elle, tout fonctionne exact
 
 Avant tout **clic** sur un élément dont le libellé contient un mot-clé jugé sensible (publier, tweeter, envoyer, répondre, payer, acheter, commander, confirmer, valider, supprimer, se désabonner, ...), l'agent s'arrête et affiche une demande de confirmation dans le panneau (boutons **Confirmer** / **Annuler**) au lieu d'exécuter le clic directement. Si tu annules, l'agent en est informé et doit trouver une autre approche ou conclure. Cette détection se fait par mots-clés sur le texte visible du bouton : elle est volontairement large (elle peut se déclencher sur un simple bandeau de cookies) plutôt que de risquer de laisser passer une vraie action irréversible (publication publique, achat, suppression).
 
+### Instructions personnalisées
+
+Le champ **"Instructions personnalisées"** des réglages permet d'ajouter tes propres consignes (ton, style, choses à éviter...), par ex. *"tutoie-moi"*, *"réponds avec humour"*, *"évite de cliquer sur les liens sponsorisés"*. Elles sont ajoutées à la suite du prompt système existant, sans jamais le remplacer — le format JSON strict et le schéma des actions restent garantis, donc ça ne peut pas casser le fonctionnement de l'agent, seulement influencer son style/comportement.
+
 ### Structure
 
 ```
@@ -181,6 +185,10 @@ This option is **off by default**: without it, everything works exactly as befor
 ### Confirmation before a sensitive action
 
 Before any **click** on an element whose label contains a keyword considered sensitive (publish, tweet, send, reply, pay, buy, order, confirm, submit, delete, unsubscribe, ...), the agent stops and shows a confirmation prompt in the panel (**Confirm** / **Cancel** buttons) instead of executing the click directly. If you cancel, the agent is told and must find another approach or wrap up. This is a keyword-based heuristic on the button's visible text — deliberately broad (it can trigger on a plain cookie banner) rather than risk missing a real irreversible action (public post, purchase, deletion).
+
+### Custom instructions
+
+The **"Custom instructions"** field in settings lets you add your own preferences (tone, style, things to avoid...), e.g. *"address me casually"*, *"answer with humor"*, *"avoid clicking sponsored links"*. They're appended after the existing system prompt, never replacing it — the strict JSON format and action schema stay guaranteed, so this can only influence the agent's style/behavior, not break how it functions.
 
 ### Structure
 

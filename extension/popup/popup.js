@@ -77,6 +77,7 @@ async function loadSettings() {
   $('language').value = settings.language;
   $('maxSteps').value = settings.maxSteps;
   $('visionEnabled').checked = !!settings.useVision;
+  $('customInstructions').value = settings.customInstructions || '';
   if (settings.model) {
     const opt = document.createElement('option');
     opt.value = settings.model;
@@ -184,6 +185,7 @@ $('save').addEventListener('click', async () => {
     language: $('language').value,
     maxSteps: Math.max(1, Math.min(60, parseInt($('maxSteps').value, 10) || 20)),
     useVision: $('visionEnabled').checked,
+    customInstructions: $('customInstructions').value.trim(),
   };
   await sendMsg({ type: 'SET_SETTINGS', settings });
   const status = $('saveStatus');

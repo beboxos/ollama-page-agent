@@ -25,7 +25,7 @@ label {
   color: #aab0bd;
   margin: 12px 0 4px;
 }
-input[type="text"], input[type="number"], select {
+input[type="text"], input[type="number"], select, textarea {
   width: 100%;
   background: #1c1f26;
   border: 1px solid rgba(255,255,255,0.12);
@@ -34,7 +34,8 @@ input[type="text"], input[type="number"], select {
   padding: 7px 9px;
   font-size: 12.5px;
 }
-input:focus, select:focus { outline: 1px solid #4f8fff; }
+textarea { resize: vertical; font-family: inherit; }
+input:focus, select:focus, textarea:focus { outline: 1px solid #4f8fff; }
 .row {
   display: flex;
   gap: 6px;

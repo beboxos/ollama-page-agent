@@ -24,9 +24,12 @@
 }
 N'inclus que les champs pertinents pour le type d'action choisi. "index" fait reference au numero entre crochets [N] devant chaque element interactif listé.`;
 
-  function systemPrompt(language, hasVision) {
+  function systemPrompt(language, hasVision, customInstructions) {
     const visionLine = hasVision
       ? '\n- Une capture d\'ecran de la zone visible t\'est aussi fournie en complement du texte, pour t\'aider a comprendre la mise en page visuellement. Elle est purement informative : pour agir, utilise toujours les index [N] du texte, jamais des coordonnees a l\'oeil.'
+      : '';
+    const customBlock = customInstructions && customInstructions.trim()
+      ? `\n\nInstructions personnalisees de l'utilisateur (a respecter en plus des regles ci-dessus, mais SANS jamais changer le format JSON attendu ni le schema des actions) :\n${customInstructions.trim()}`
       : '';
     return `Tu es un agent qui pilote un navigateur web pour accomplir un objectif donne par l'utilisateur, en observant une representation textuelle simplifiee de la page (elements interactifs numerotes [0], [1], ...).
 Regles:
@@ -38,7 +41,7 @@ Regles:
 - Ne jamais inventer un index qui n'est pas dans la liste fournie.
 - Certains elements peuvent provenir d'un iframe (marque par une ligne "-- iframe ... --" dans la liste) : ils s'utilisent exactement comme les autres, par leur numero.
 - Reponds toujours dans la langue: ${language || 'fr-FR'}.${visionLine}
-${ACTION_SCHEMA_DOC}`;
+${ACTION_SCHEMA_DOC}${customBlock}`;
   }
 
   function captureScreenshotRaw() {
@@ -259,7 +262,7 @@ ${ACTION_SCHEMA_DOC}`;
       if (images) userMessage.images = images;
 
       const messages = [
-        { role: 'system', content: systemPrompt(settings.language, settings.useVision) },
+        { role: 'system', content: systemPrompt(settings.language, settings.useVision, settings.customInstructions) },
         userMessage,
       ];
 
