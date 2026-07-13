@@ -176,7 +176,13 @@
     shadow.append(style, bubble, panel);
     (document.documentElement || document.body).appendChild(host);
 
-    bubble.addEventListener('click', () => panel.classList.toggle('open'));
+    const bubbleDrag = makeDraggable(bubble, bubble, (pos) => {
+      chrome.storage.local.set({ [POS_KEY_BUBBLE]: pos }).catch(() => {});
+    });
+    bubble.addEventListener('click', () => {
+      if (bubbleDrag.wasDragged()) return;
+      panel.classList.toggle('open');
+    });
     closeBtn.addEventListener('click', () => panel.classList.remove('open'));
     settingsBtn.addEventListener('click', () => {
       chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
@@ -201,29 +207,81 @@
       }
     });
 
-    makeDraggable(header, panel);
+    makeDraggable(header, panel, (pos) => {
+      chrome.storage.local.set({ [POS_KEY_PANEL]: pos }).catch(() => {});
+    });
+    restorePositions(bubble, panel);
 
     els = { bubble, panel, dot, log, textarea, runBtn };
   }
 
-  function makeDraggable(handle, panel) {
-    let dragging = false, startX, startY, startRect;
+  const POS_KEY_BUBBLE = 'pa_bubble_pos';
+  const POS_KEY_PANEL = 'pa_panel_pos';
+
+  function clampPos(left, top, width, height) {
+    return {
+      left: Math.max(4, Math.min(innerWidth - width - 4, left)),
+      top: Math.max(4, Math.min(innerHeight - height - 4, top)),
+    };
+  }
+
+  async function restorePositions(bubble, panel) {
+    try {
+      const stored = await chrome.storage.local.get([POS_KEY_BUBBLE, POS_KEY_PANEL]);
+      const bp = stored[POS_KEY_BUBBLE];
+      if (bp) {
+        const { left, top } = clampPos(bp.left, bp.top, 52, 52);
+        bubble.style.left = left + 'px';
+        bubble.style.top = top + 'px';
+        bubble.style.right = 'auto';
+        bubble.style.bottom = 'auto';
+      }
+      const pp = stored[POS_KEY_PANEL];
+      if (pp) {
+        const { left, top } = clampPos(pp.left, pp.top, 340, 400);
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+      }
+    } catch {
+      // storage unavailable, keep default corner position
+    }
+  }
+
+  // Drags `moveTarget` by pressing on `handle` (same element for the bubble,
+  // the panel's header for the panel). Distinguishes a plain click (no
+  // movement) from an actual drag so the bubble's open/close toggle still
+  // works; `wasDragged()` tells the caller which one just happened.
+  function makeDraggable(handle, moveTarget, onMoved) {
+    let dragging = false, moved = false, startX, startY, startRect;
     handle.addEventListener('mousedown', (e) => {
-      if (e.target.tagName === 'BUTTON') return;
+      if (e.target.tagName === 'BUTTON' && e.target !== handle) return;
       dragging = true;
+      moved = false;
       startX = e.clientX; startY = e.clientY;
-      startRect = panel.getBoundingClientRect();
+      startRect = moveTarget.getBoundingClientRect();
       e.preventDefault();
     });
     window.addEventListener('mousemove', (e) => {
       if (!dragging) return;
       const dx = e.clientX - startX, dy = e.clientY - startY;
-      panel.style.left = Math.max(4, startRect.left + dx) + 'px';
-      panel.style.top = Math.max(4, startRect.top + dy) + 'px';
-      panel.style.right = 'auto';
-      panel.style.bottom = 'auto';
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      if (!moved) return;
+      const { left, top } = clampPos(startRect.left + dx, startRect.top + dy, startRect.width, startRect.height);
+      moveTarget.style.left = left + 'px';
+      moveTarget.style.top = top + 'px';
+      moveTarget.style.right = 'auto';
+      moveTarget.style.bottom = 'auto';
     });
-    window.addEventListener('mouseup', () => { dragging = false; });
+    window.addEventListener('mouseup', () => {
+      if (dragging && moved) {
+        const rect = moveTarget.getBoundingClientRect();
+        onMoved && onMoved({ left: rect.left, top: rect.top });
+      }
+      dragging = false;
+    });
+    return { wasDragged: () => moved };
   }
 
   function open() {

@@ -65,6 +65,8 @@ Sur n'importe quelle page, une bulle 🤖 apparaît en bas à droite. Clique des
 
 Le panneau affiche en temps réel les pensées du modèle et les actions exécutées, pendant que le curseur visuel se déplace sur la page. Deux boutons dans l'en-tête donnent accès à l'historique des tâches passées sur ce site (🕘) et permettent de le vider (🗑). La tâche survit à une navigation (changement de page) : elle reprend automatiquement avec sa mémoire si le modèle a cliqué un lien. Les éléments situés dans des iframes de la page sont aussi détectés et pilotables.
 
+La bulle 🤖 et le panneau (via son en-tête) se déplacent librement par glisser-déposer si leur position par défaut te gêne — la nouvelle position est mémorisée et réappliquée sur toutes les pages.
+
 Le widget ne s'affiche jamais à l'impression (`@media print`). Pour le désactiver complètement sur un site donné, ouvre le popup de l'extension (icône dans la barre d'outils) **sur ce site** et bascule l'interrupteur **"Actif sur ce site"** — un rafraîchissement de la page applique le changement.
 
 ### Vision (modèles multimodaux)
@@ -165,6 +167,8 @@ Click the extension's toolbar icon (or the gear icon in the floating widget):
 On any page, a 🤖 bubble appears bottom-right. Click it, type your goal ("fill the contact form with my name John Doe", "summarize this article", "find the unsubscribe link and click it", ...) and launch.
 
 The panel shows the model's reasoning and executed actions live, while the visual cursor moves across the page. Two header buttons give access to this site's task history (🕘) and let you clear it (🗑). A task survives a navigation (page change): it automatically resumes with its memory if the model clicked a link. Elements inside same-page iframes are also detected and controllable.
+
+The 🤖 bubble and the panel (via its header) can both be freely dragged if their default corner gets in the way — the new position is remembered and reapplied on every page.
 
 The widget never shows up when printing (`@media print`). To turn it off entirely for a given site, open the extension's toolbar popup **on that site** and flip the **"Active on this site"** switch — refresh the page for the change to take effect.
 
