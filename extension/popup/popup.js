@@ -18,6 +18,59 @@ function originFromBaseUrl(baseUrl) {
   }
 }
 
+const DISABLED_SITES_KEY = 'pa_disabled_sites';
+let currentSiteOrigin = null;
+
+async function getDisabledSites() {
+  const stored = await chrome.storage.local.get(DISABLED_SITES_KEY);
+  return stored[DISABLED_SITES_KEY] || [];
+}
+
+async function loadSiteToggle() {
+  const hostEl = $('siteHost');
+  const checkbox = $('siteEnabled');
+  let tab;
+  try {
+    [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  } catch {
+    tab = null;
+  }
+  let origin = null;
+  let hostname = null;
+  try {
+    const u = new URL(tab?.url || '');
+    if (u.protocol === 'http:' || u.protocol === 'https:') {
+      origin = u.origin;
+      hostname = u.hostname;
+    }
+  } catch {
+    // no accessible tab URL (e.g. options page opened in its own tab)
+  }
+
+  if (!origin) {
+    hostEl.textContent = 'Non disponible depuis cette page';
+    checkbox.checked = false;
+    checkbox.disabled = true;
+    $('siteHint').textContent = "Ouvre le popup depuis l'icone de la barre d'outils, sur le site concerne.";
+    return;
+  }
+
+  currentSiteOrigin = origin;
+  hostEl.textContent = hostname;
+  checkbox.disabled = false;
+  const disabled = await getDisabledSites();
+  checkbox.checked = !disabled.includes(origin);
+}
+
+$('siteEnabled').addEventListener('change', async (e) => {
+  if (!currentSiteOrigin) return;
+  const disabled = await getDisabledSites();
+  const idx = disabled.indexOf(currentSiteOrigin);
+  if (e.target.checked && idx !== -1) disabled.splice(idx, 1);
+  if (!e.target.checked && idx === -1) disabled.push(currentSiteOrigin);
+  await chrome.storage.local.set({ [DISABLED_SITES_KEY]: disabled });
+});
+
 async function loadSettings() {
   const { settings } = await sendMsg({ type: 'GET_SETTINGS' });
   $('baseUrl').value = settings.baseUrl;
@@ -108,3 +161,4 @@ $('save').addEventListener('click', async () => {
 });
 
 loadSettings();
+loadSiteToggle();

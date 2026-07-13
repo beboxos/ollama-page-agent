@@ -10,6 +10,9 @@
   let pos = { x: null, y: null }; // panel top-left, null = use CSS default (bottom-right)
 
   const STYLE = `
+    @media print {
+      :host { display: none !important; }
+    }
     :host { all: initial; }
     * { box-sizing: border-box; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
     .bubble {

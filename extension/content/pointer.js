@@ -14,6 +14,9 @@
     shadow = host.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
     style.textContent = `
+      @media print {
+        :host { display: none !important; }
+      }
       .cursor {
         position: fixed;
         width: 18px;

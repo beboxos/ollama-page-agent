@@ -17,6 +17,14 @@
     });
   }
 
+  const DISABLED_SITES_KEY = 'pa_disabled_sites';
+
+  async function isSiteDisabled() {
+    const stored = await chrome.storage.local.get(DISABLED_SITES_KEY);
+    const list = stored[DISABLED_SITES_KEY] || [];
+    return list.includes(location.origin);
+  }
+
   const HISTORY_MAX = 15;
   const historyKey = () => 'pa_history_' + location.origin;
 
@@ -135,6 +143,7 @@
 
   async function init() {
     if (!PA.frames.isTop) return; // iframes only run the passive frame_bridge listener
+    if (await isSiteDisabled()) return; // user turned the widget off for this site
 
     PA.widget.ensureInit();
     PA.widget.onRun((goal) => {

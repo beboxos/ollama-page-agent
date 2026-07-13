@@ -10,6 +10,18 @@
     <h1>Ollama Page Agent</h1>
     <p class="sub">Configure la connexion a ton serveur Ollama local. Rien ne quitte ta machine.</p>
 
+    <div class="site-toggle-row">
+      <div>
+        <div class="site-toggle-label">Actif sur ce site</div>
+        <div id="siteHost" class="hint">-</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="siteEnabled" />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint" id="siteHint">Rafraichis la page apres avoir change ce reglage.</p>
+
     <label>Adresse du serveur Ollama</label>
     <div class="row">
       <input id="baseUrl" type="text" placeholder="http://localhost:11434" />
