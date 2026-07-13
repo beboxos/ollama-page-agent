@@ -87,6 +87,16 @@
     .entry.error { background: rgba(239,68,68,0.15); color: #ffb4b4; }
     .entry.system { color: #8a90a0; font-style: italic; }
     .entry.done { background: rgba(34,197,94,0.15); color: #b6f5cc; }
+    .entry.confirm { background: rgba(245,158,66,0.14); color: #ffdcae; border: 1px solid rgba(245,158,66,0.35); }
+    .entry.confirm .confirm-detail { color: #c9a880; font-size: 11px; margin-top: 3px; }
+    .entry.confirm .confirm-buttons { display: flex; gap: 6px; margin-top: 8px; }
+    .confirm-btn {
+      border: none; border-radius: 6px; padding: 5px 12px; font-size: 11.5px;
+      font-weight: 600; cursor: pointer;
+    }
+    .confirm-btn.yes { background: #f59e42; color: #201200; }
+    .confirm-btn.no { background: rgba(255,255,255,0.1); color: #e7e9ee; }
+    .confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .composer {
       display: flex;
       gap: 6px;
@@ -253,5 +263,38 @@
   function onClearHistory(fn) { handlers.clearHistory = fn; }
   function getGoal() { return els.textarea ? els.textarea.value.trim() : ''; }
 
-  PA.widget = { ensureInit, open, log, clearLog, setStatus, setRunning, onRun, onStop, onHistory, onClearHistory, getGoal };
+  // Pauses the run with an inline Confirm/Cancel prompt for a sensitive
+  // action (publish, pay, delete, ...) instead of executing it blindly.
+  function confirmAction(label, detail) {
+    ensureInit();
+    open();
+    return new Promise((resolve) => {
+      const wrap = el('div', 'entry confirm');
+      const text = el('div', '', `⚠️ Action sensible detectee : "${label}"`);
+      const sub = el('div', 'confirm-detail', detail || '');
+      const btnRow = el('div', 'confirm-buttons');
+      const yesBtn = el('button', 'confirm-btn yes', 'Confirmer');
+      const noBtn = el('button', 'confirm-btn no', 'Annuler');
+      btnRow.append(yesBtn, noBtn);
+      wrap.append(text, sub, btnRow);
+      els.log.appendChild(wrap);
+      els.log.scrollTop = els.log.scrollHeight;
+
+      function finish(value) {
+        yesBtn.disabled = true;
+        noBtn.disabled = true;
+        text.textContent = value ? `✓ Action autorisee : "${label}"` : `✗ Action annulee : "${label}"`;
+        sub.remove();
+        btnRow.remove();
+        resolve(value);
+      }
+      yesBtn.addEventListener('click', () => finish(true));
+      noBtn.addEventListener('click', () => finish(false));
+    });
+  }
+
+  PA.widget = {
+    ensureInit, open, log, clearLog, setStatus, setRunning,
+    onRun, onStop, onHistory, onClearHistory, confirmAction, getGoal,
+  };
 })();

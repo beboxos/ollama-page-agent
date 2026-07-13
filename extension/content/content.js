@@ -122,6 +122,12 @@
       onPersist(state) {
         sendMsg({ type: 'SET_SESSION', session: { running: true, goal, ...state } }).catch(() => {});
       },
+      async onConfirmAction(label, detail) {
+        PA.widget.setStatus('idle');
+        const confirmed = await PA.widget.confirmAction(label, detail);
+        PA.widget.setStatus('running');
+        return confirmed;
+      },
     });
 
     const historyBlock = resumeState ? '' : formatHistoryForPrompt(await loadHistory());

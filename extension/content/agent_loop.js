@@ -227,7 +227,7 @@ ${ACTION_SCHEMA_DOC}`;
     });
   }
 
-  function createController({ onThought, onActionResult, onError, onFinish, onAskUser, onStep, onPersist }) {
+  function createController({ onThought, onActionResult, onError, onFinish, onAskUser, onConfirmAction, onStep, onPersist }) {
     let stopped = false;
     let currentGoal = '';
     let memory = '';
@@ -277,7 +277,15 @@ ${ACTION_SCHEMA_DOC}`;
       if (!parsed || !parsed.action) {
         throw new Error('Le modele n\'a pas renvoye un JSON exploitable: ' + raw.slice(0, 200));
       }
-      return { parsed, routes };
+      return { parsed, routes, lines };
+    }
+
+    const SENSITIVE_ACTION_RE = /\b(publier|poster|tweet(er)?|envoyer|soumettre|submit|send|r[ée]pondre|reply|commenter|comment|payer|paiement|pay|acheter|buy|commander|order|checkout|purchase|confirmer|confirm|valider|supprimer|effacer|delete|remove|d[ée]sabonner|unsubscribe)\b/i;
+
+    function sensitiveLabel(lineText) {
+      if (!lineText || !SENSITIVE_ACTION_RE.test(lineText)) return null;
+      const quoted = lineText.match(/"([^"]*)"/);
+      return quoted ? quoted[1] : lineText.replace(/^\[\d+\]\s*/, '');
     }
 
     function actionSignature(action) {
@@ -296,9 +304,9 @@ ${ACTION_SCHEMA_DOC}`;
 
       while (!stopped && stepNum <= settings.maxSteps) {
         onStep && onStep(stepNum, settings.maxSteps);
-        let parsed, routes;
+        let parsed, routes, lines;
         try {
-          ({ parsed, routes } = await step(settings, lastResult, stepNum, historyBlock));
+          ({ parsed, routes, lines } = await step(settings, lastResult, stepNum, historyBlock));
         } catch (e) {
           onError && onError(e.message || String(e));
           return;
@@ -320,6 +328,22 @@ ${ACTION_SCHEMA_DOC}`;
           stepNum += 1;
           onPersist && onPersist(getState(lastResult, stepNum));
           continue;
+        }
+
+        if (action.type === 'click') {
+          const label = sensitiveLabel(lines[action.index]);
+          if (label) {
+            const confirmed = onConfirmAction
+              ? await onConfirmAction(label, lines[action.index])
+              : true;
+            if (stopped) return;
+            if (!confirmed) {
+              lastResult = `L'utilisateur a refuse cette action jugee sensible ("${label}"). Choisis une autre approche, utilise "ask_user" pour clarifier, ou conclus avec "finish" si tu ne peux pas continuer sans elle.`;
+              stepNum += 1;
+              onPersist && onPersist(getState(lastResult, stepNum));
+              continue;
+            }
+          }
         }
 
         let result;

@@ -73,6 +73,10 @@ Si tu utilises un modèle Ollama multimodal (ex : `gemma3`, `llava`, `qwen2-vl`)
 
 Cette option est **désactivée par défaut** : sans elle, tout fonctionne exactement comme avant (texte seul), y compris avec des modèles non multimodaux. L'activer nécessite d'autoriser la capture d'écran sur tous les sites (bouton dédié dans les réglages) — permission plus large que le strict nécessaire pour le reste de l'extension, à activer uniquement si tu comptes t'en servir.
 
+### Confirmation avant une action sensible
+
+Avant tout **clic** sur un élément dont le libellé contient un mot-clé jugé sensible (publier, tweeter, envoyer, répondre, payer, acheter, commander, confirmer, valider, supprimer, se désabonner, ...), l'agent s'arrête et affiche une demande de confirmation dans le panneau (boutons **Confirmer** / **Annuler**) au lieu d'exécuter le clic directement. Si tu annules, l'agent en est informé et doit trouver une autre approche ou conclure. Cette détection se fait par mots-clés sur le texte visible du bouton : elle est volontairement large (elle peut se déclencher sur un simple bandeau de cookies) plutôt que de risquer de laisser passer une vraie action irréversible (publication publique, achat, suppression).
+
 ### Structure
 
 ```
@@ -169,6 +173,10 @@ The widget never shows up when printing (`@media print`). To turn it off entirel
 If you're running a multimodal Ollama model (e.g. `gemma3`, `llava`, `qwen2-vl`), you can enable **"Vision"** in settings: a screenshot of the visible area is then sent alongside the text on every step, to help the model make sense of ambiguous layouts. It's purely informational — actions still always go through `[N]` indices, never coordinates.
 
 This option is **off by default**: without it, everything works exactly as before (text only), including with non-multimodal models. Turning it on requires authorizing screenshot capture on all sites (dedicated button in settings) — a broader permission than the rest of the extension strictly needs, so only grant it if you actually plan to use this feature.
+
+### Confirmation before a sensitive action
+
+Before any **click** on an element whose label contains a keyword considered sensitive (publish, tweet, send, reply, pay, buy, order, confirm, submit, delete, unsubscribe, ...), the agent stops and shows a confirmation prompt in the panel (**Confirm** / **Cancel** buttons) instead of executing the click directly. If you cancel, the agent is told and must find another approach or wrap up. This is a keyword-based heuristic on the button's visible text — deliberately broad (it can trigger on a plain cookie banner) rather than risk missing a real irreversible action (public post, purchase, deletion).
 
 ### Structure
 
