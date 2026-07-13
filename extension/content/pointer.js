@@ -26,8 +26,9 @@
         border-radius: 50%;
         background: radial-gradient(circle at 35% 35%, #7fb0ff, #2a5cd6);
         box-shadow: 0 0 0 3px rgba(79,143,255,0.35), 0 2px 8px rgba(0,0,0,0.35);
-        transition: top 420ms cubic-bezier(.22,.68,0,1.01), left 420ms cubic-bezier(.22,.68,0,1.01), transform 150ms ease;
+        transition: top 420ms cubic-bezier(.22,.68,0,1.01), left 420ms cubic-bezier(.22,.68,0,1.01), transform 150ms ease, opacity 200ms ease;
         pointer-events: none;
+        opacity: 0;
       }
       .cursor::after {
         content: '';
@@ -81,6 +82,7 @@
 
   async function moveTo(x, y) {
     ensureInit();
+    pointerEl.style.opacity = '1';
     pointerEl.style.left = x + 'px';
     pointerEl.style.top = y + 'px';
     lastX = x; lastY = y;
@@ -130,6 +132,7 @@
 
   function clear() {
     if (highlightEl) highlightEl.style.opacity = '0';
+    if (pointerEl) pointerEl.style.opacity = '0';
   }
 
   PA.pointer = { actOn, moveTo, ripple, clear };
