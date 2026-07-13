@@ -176,6 +176,18 @@
     shadow.append(style, bubble, panel);
     (document.documentElement || document.body).appendChild(host);
 
+    // Sites like Discord/Slack/Gmail install a document-level keydown
+    // listener that auto-focuses their own text field whenever a keystroke
+    // doesn't look like it came from a real input. Because our widget lives
+    // in a shadow root, such listeners see the retargeted event.target as
+    // our plain host <div>, not the actual focused <textarea> - so they
+    // "helpfully" steal every keystroke. Stop these events at the shadow
+    // boundary so the host page never sees them.
+    for (const evtName of ['keydown', 'keyup', 'keypress', 'input']) {
+      panel.addEventListener(evtName, (e) => e.stopPropagation());
+      bubble.addEventListener(evtName, (e) => e.stopPropagation());
+    }
+
     const bubbleDrag = makeDraggable(bubble, bubble, (pos) => {
       chrome.storage.local.set({ [POS_KEY_BUBBLE]: pos }).catch(() => {});
     });
