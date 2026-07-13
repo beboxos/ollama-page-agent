@@ -47,6 +47,21 @@
     <label>Nombre maximum d'etapes</label>
     <input id="maxSteps" type="number" min="1" max="60" />
 
+    <div class="site-toggle-row" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 14px; padding-top: 12px;">
+      <div>
+        <div class="site-toggle-label">Vision (modeles multimodaux)</div>
+        <div class="hint" style="margin-top:2px;">Envoie aussi une capture d'ecran a chaque etape (ex: gemma3, llava, qwen2-vl). Sans effet avec un modele texte seul.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="visionEnabled" />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="row" style="margin-top:6px;">
+      <button id="visionAuthorize" class="secondary">Autoriser la capture d'ecran (tous les sites)</button>
+    </div>
+    <p class="hint" id="visionHint"></p>
+
     <div class="row end">
       <span id="saveStatus" class="hint"></span>
       <button id="save" class="primary">Enregistrer</button>

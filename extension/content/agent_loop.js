@@ -24,7 +24,10 @@
 }
 N'inclus que les champs pertinents pour le type d'action choisi. "index" fait reference au numero entre crochets [N] devant chaque element interactif listé.`;
 
-  function systemPrompt(language) {
+  function systemPrompt(language, hasVision) {
+    const visionLine = hasVision
+      ? '\n- Une capture d\'ecran de la zone visible t\'est aussi fournie en complement du texte, pour t\'aider a comprendre la mise en page visuellement. Elle est purement informative : pour agir, utilise toujours les index [N] du texte, jamais des coordonnees a l\'oeil.'
+      : '';
     return `Tu es un agent qui pilote un navigateur web pour accomplir un objectif donne par l'utilisateur, en observant une representation textuelle simplifiee de la page (elements interactifs numerotes [0], [1], ...).
 Regles:
 - Une seule action a la fois. Observe le resultat avant de continuer.
@@ -34,8 +37,44 @@ Regles:
 - Utilise "finish" des que l'objectif est atteint, ou si tu es bloque apres plusieurs tentatives (success=false et explique pourquoi).
 - Ne jamais inventer un index qui n'est pas dans la liste fournie.
 - Certains elements peuvent provenir d'un iframe (marque par une ligne "-- iframe ... --" dans la liste) : ils s'utilisent exactement comme les autres, par leur numero.
-- Reponds toujours dans la langue: ${language || 'fr-FR'}.
+- Reponds toujours dans la langue: ${language || 'fr-FR'}.${visionLine}
 ${ACTION_SCHEMA_DOC}`;
+  }
+
+  function captureScreenshotRaw() {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: 'CAPTURE_SCREENSHOT' }, (res) => {
+        if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+        if (!res || !res.ok) return reject(new Error(res?.error || "Capture d'ecran impossible."));
+        resolve(res.dataUrl);
+      });
+    });
+  }
+
+  // Downscales the raw capture so it stays cheap to send to the model (long
+  // side capped at ~1024px, re-encoded as jpeg), and returns bare base64
+  // (no "data:image/jpeg;base64," prefix) as Ollama's `images` field expects.
+  function resizeImageDataUrl(dataUrl, maxDim = 1024, quality = 0.6) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality).split(',')[1]);
+      };
+      img.onerror = () => reject(new Error('Image de capture invalide.'));
+      img.src = dataUrl;
+    });
+  }
+
+  async function captureScreenshotBase64() {
+    const dataUrl = await captureScreenshotRaw();
+    return resizeImageDataUrl(dataUrl);
   }
 
   function extractJson(text) {
@@ -206,11 +245,22 @@ ${ACTION_SCHEMA_DOC}`;
         '',
         domSnapshot,
       );
+      let images;
+      if (settings.useVision) {
+        try {
+          images = [await captureScreenshotBase64()];
+        } catch (e) {
+          userMsgParts.push('', `(Capture d'ecran indisponible: ${e.message})`);
+        }
+      }
       const userMsg = userMsgParts.join('\n');
 
+      const userMessage = { role: 'user', content: userMsg };
+      if (images) userMessage.images = images;
+
       const messages = [
-        { role: 'system', content: systemPrompt(settings.language) },
-        { role: 'user', content: userMsg },
+        { role: 'system', content: systemPrompt(settings.language, settings.useVision) },
+        userMessage,
       ];
 
       let raw = await chat(messages, settings);

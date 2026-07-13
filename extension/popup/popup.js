@@ -76,6 +76,7 @@ async function loadSettings() {
   $('baseUrl').value = settings.baseUrl;
   $('language').value = settings.language;
   $('maxSteps').value = settings.maxSteps;
+  $('visionEnabled').checked = !!settings.useVision;
   if (settings.model) {
     const opt = document.createElement('option');
     opt.value = settings.model;
@@ -84,7 +85,37 @@ async function loadSettings() {
   }
   await checkPermission();
   await refreshModels(false);
+  await checkVisionPermission();
 }
+
+async function checkVisionPermission() {
+  const granted = await chrome.permissions.contains({ origins: ['<all_urls>'] });
+  const hint = $('visionHint');
+  hint.textContent = granted
+    ? "Autorisation accordee : la capture d'ecran fonctionnera sur tous les sites."
+    : "Non autorise pour l'instant. Clique sur le bouton ci-dessus avant d'activer Vision.";
+  hint.className = 'hint ' + (granted ? 'ok' : '');
+  return granted;
+}
+
+$('visionAuthorize').addEventListener('click', async () => {
+  try {
+    await chrome.permissions.request({ origins: ['<all_urls>'] });
+  } catch (e) {
+    $('visionHint').textContent = e.message;
+    $('visionHint').className = 'hint err';
+    return;
+  }
+  await checkVisionPermission();
+});
+
+$('visionEnabled').addEventListener('change', async (e) => {
+  if (!e.target.checked) return;
+  const granted = await checkVisionPermission();
+  if (!granted) {
+    e.target.checked = false;
+  }
+});
 
 async function checkPermission() {
   const origin = originFromBaseUrl($('baseUrl').value.trim());
@@ -152,6 +183,7 @@ $('save').addEventListener('click', async () => {
     model: $('model').value,
     language: $('language').value,
     maxSteps: Math.max(1, Math.min(60, parseInt($('maxSteps').value, 10) || 20)),
+    useVision: $('visionEnabled').checked,
   };
   await sendMsg({ type: 'SET_SETTINGS', settings });
   const status = $('saveStatus');

@@ -8,6 +8,7 @@ const DEFAULT_SETTINGS = {
   language: 'fr-FR',
   maxSteps: 20,
   temperature: 0.2,
+  useVision: false,
 };
 
 async function getSettings() {
@@ -97,6 +98,22 @@ async function chat({ baseUrl, model, messages, temperature }) {
   return data.message?.content ?? '';
 }
 
+async function captureScreenshot(tab) {
+  if (!tab) {
+    const err = new Error("Pas d'onglet associe a cette demande.");
+    throw err;
+  }
+  const allowed = await chrome.permissions.contains({ origins: ['<all_urls>'] });
+  if (!allowed) {
+    const err = new Error(
+      "Permission manquante pour capturer l'ecran. Active 'Vision' dans les reglages et autorise sur tous les sites."
+    );
+    err.code = 'NO_PERMISSION';
+    throw err;
+  }
+  return chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 70 });
+}
+
 async function getSession(tabId) {
   const key = `session_${tabId}`;
   const stored = await chrome.storage.session.get(key);
@@ -151,6 +168,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case 'OPEN_OPTIONS': {
           await chrome.runtime.openOptionsPage();
           sendResponse({ ok: true });
+          break;
+        }
+        case 'CAPTURE_SCREENSHOT': {
+          const dataUrl = await captureScreenshot(sender.tab);
+          sendResponse({ ok: true, dataUrl });
           break;
         }
         case 'CHAT': {

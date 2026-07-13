@@ -67,6 +67,12 @@ Le panneau affiche en temps réel les pensées du modèle et les actions exécut
 
 Le widget ne s'affiche jamais à l'impression (`@media print`). Pour le désactiver complètement sur un site donné, ouvre le popup de l'extension (icône dans la barre d'outils) **sur ce site** et bascule l'interrupteur **"Actif sur ce site"** — un rafraîchissement de la page applique le changement.
 
+### Vision (modèles multimodaux)
+
+Si tu utilises un modèle Ollama multimodal (ex : `gemma3`, `llava`, `qwen2-vl`), tu peux activer l'option **"Vision"** dans les réglages : une capture d'écran de la zone visible est alors envoyée en complément du texte à chaque étape, pour aider le modèle à mieux comprendre des mises en page ambiguës. Ça reste purement informatif — les actions se font toujours par index `[N]`, jamais par coordonnées.
+
+Cette option est **désactivée par défaut** : sans elle, tout fonctionne exactement comme avant (texte seul), y compris avec des modèles non multimodaux. L'activer nécessite d'autoriser la capture d'écran sur tous les sites (bouton dédié dans les réglages) — permission plus large que le strict nécessaire pour le reste de l'extension, à activer uniquement si tu comptes t'en servir.
+
 ### Structure
 
 ```
@@ -157,6 +163,12 @@ On any page, a 🤖 bubble appears bottom-right. Click it, type your goal ("fill
 The panel shows the model's reasoning and executed actions live, while the visual cursor moves across the page. Two header buttons give access to this site's task history (🕘) and let you clear it (🗑). A task survives a navigation (page change): it automatically resumes with its memory if the model clicked a link. Elements inside same-page iframes are also detected and controllable.
 
 The widget never shows up when printing (`@media print`). To turn it off entirely for a given site, open the extension's toolbar popup **on that site** and flip the **"Active on this site"** switch — refresh the page for the change to take effect.
+
+### Vision (multimodal models)
+
+If you're running a multimodal Ollama model (e.g. `gemma3`, `llava`, `qwen2-vl`), you can enable **"Vision"** in settings: a screenshot of the visible area is then sent alongside the text on every step, to help the model make sense of ambiguous layouts. It's purely informational — actions still always go through `[N]` indices, never coordinates.
+
+This option is **off by default**: without it, everything works exactly as before (text only), including with non-multimodal models. Turning it on requires authorizing screenshot capture on all sites (dedicated button in settings) — a broader permission than the rest of the extension strictly needs, so only grant it if you actually plan to use this feature.
 
 ### Structure
 
