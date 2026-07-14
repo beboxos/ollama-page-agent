@@ -3,6 +3,7 @@
 // the page's CSP/CORS jail; the background worker does not.
 
 const DEFAULT_SETTINGS = {
+  provider: 'ollama', // 'ollama' | 'openai' (any OpenAI-compatible server: LM Studio, FastFlowLM, vLLM, ...)
   baseUrl: 'http://localhost:11434',
   model: '',
   language: 'fr-FR',
@@ -51,7 +52,7 @@ async function hasHostPermission(baseUrl) {
   }
 }
 
-async function ollamaFetch(baseUrl, path, options) {
+async function apiFetch(baseUrl, path, options, serverLabel) {
   const allowed = await hasHostPermission(baseUrl);
   if (!allowed) {
     const err = new Error(
@@ -65,7 +66,7 @@ async function ollamaFetch(baseUrl, path, options) {
     res = await fetch(baseUrl.replace(/\/$/, '') + path, options);
   } catch (e) {
     const err = new Error(
-      `Impossible de joindre Ollama sur ${baseUrl}. Verifie qu'Ollama tourne (ollama serve) et que OLLAMA_ORIGINS autorise cette extension.`
+      `Impossible de joindre ${serverLabel} sur ${baseUrl}. Verifie qu'il tourne et qu'il autorise les requetes venant d'une extension Chrome (CORS).`
     );
     err.code = 'NETWORK_ERROR';
     err.cause = e;
@@ -73,30 +74,84 @@ async function ollamaFetch(baseUrl, path, options) {
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const err = new Error(`Ollama a repondu ${res.status}: ${text.slice(0, 300)}`);
+    const err = new Error(`${serverLabel} a repondu ${res.status}: ${text.slice(0, 300)}`);
     err.code = 'HTTP_ERROR';
     throw err;
   }
   return res.json();
 }
 
-async function listModels(baseUrl) {
-  const data = await ollamaFetch(baseUrl, '/api/tags', { method: 'GET' });
+// Normalizes to ".../v1" regardless of whether the user already typed the
+// "/v1" suffix themselves.
+function toV1Base(baseUrl) {
+  return baseUrl.replace(/\/$/, '').replace(/\/v1$/, '') + '/v1';
+}
+
+async function listModels(baseUrl, provider) {
+  if (provider === 'openai') {
+    const data = await apiFetch(toV1Base(baseUrl), '/models', { method: 'GET' }, 'le serveur');
+    return (data.data || []).map((m) => m.id);
+  }
+  const data = await apiFetch(baseUrl, '/api/tags', { method: 'GET' }, 'Ollama');
   return (data.models || []).map((m) => m.name);
 }
 
-async function chat({ baseUrl, model, messages, temperature }) {
-  const data = await ollamaFetch(baseUrl, '/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: false,
-      format: 'json',
-      options: { temperature: temperature ?? 0.2 },
-    }),
+// Reshapes Ollama-style messages ({role, content, images: [base64,...]}) into
+// OpenAI's content-array format ({role, content: [{type:'text',...},
+// {type:'image_url',...}]}) - the two APIs disagree on how images attach to
+// a message. Messages without images pass through as plain strings.
+function toOpenAiMessages(messages) {
+  return messages.map((m) => {
+    if (!m.images || !m.images.length) {
+      const { images, ...rest } = m;
+      return rest;
+    }
+    return {
+      role: m.role,
+      content: [
+        { type: 'text', text: m.content },
+        ...m.images.map((img) => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${img}` } })),
+      ],
+    };
   });
+}
+
+async function chat({ baseUrl, model, messages, temperature, provider }) {
+  if (provider === 'openai') {
+    const data = await apiFetch(
+      toV1Base(baseUrl),
+      '/chat/completions',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: toOpenAiMessages(messages),
+          stream: false,
+          response_format: { type: 'json_object' },
+          temperature: temperature ?? 0.2,
+        }),
+      },
+      'le serveur'
+    );
+    return data.choices?.[0]?.message?.content ?? '';
+  }
+  const data = await apiFetch(
+    baseUrl,
+    '/api/chat',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        format: 'json',
+        options: { temperature: temperature ?? 0.2 },
+      }),
+    },
+    'Ollama'
+  );
   return data.message?.content ?? '';
 }
 
@@ -163,7 +218,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case 'LIST_MODELS': {
           const settings = await getSettings();
           const baseUrl = msg.baseUrl || settings.baseUrl;
-          const models = await listModels(baseUrl);
+          const provider = msg.provider || settings.provider;
+          const models = await listModels(baseUrl, provider);
           sendResponse({ ok: true, models });
           break;
         }
@@ -184,6 +240,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             model: msg.model || settings.model,
             messages: msg.messages,
             temperature: settings.temperature,
+            provider: settings.provider,
           });
           sendResponse({ ok: true, content });
           break;

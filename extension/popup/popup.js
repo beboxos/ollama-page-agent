@@ -71,8 +71,16 @@ $('siteEnabled').addEventListener('change', async (e) => {
   await chrome.storage.local.set({ [DISABLED_SITES_KEY]: disabled });
 });
 
+function updateBaseUrlLabel() {
+  const isOpenAi = $('provider').value === 'openai';
+  $('baseUrlLabel').textContent = isOpenAi ? 'Adresse du serveur' : 'Adresse du serveur Ollama';
+  $('baseUrl').placeholder = isOpenAi ? 'http://192.168.1.50:52625' : 'http://localhost:11434';
+}
+
 async function loadSettings() {
   const { settings } = await sendMsg({ type: 'GET_SETTINGS' });
+  $('provider').value = settings.provider || 'ollama';
+  updateBaseUrlLabel();
   $('baseUrl').value = settings.baseUrl;
   $('language').value = settings.language;
   $('maxSteps').value = settings.maxSteps;
@@ -138,11 +146,17 @@ async function refreshModels(showErrors) {
   const select = $('model');
   const current = select.value;
   try {
-    const res = await sendMsg({ type: 'LIST_MODELS', baseUrl: $('baseUrl').value.trim() });
+    const res = await sendMsg({
+      type: 'LIST_MODELS',
+      baseUrl: $('baseUrl').value.trim(),
+      provider: $('provider').value,
+    });
     if (!res.ok) throw new Error(res.error);
     select.innerHTML = '';
     if (!res.models.length) {
-      modelHint.textContent = "Aucun modele installe. Fais 'ollama pull <modele>' dans un terminal.";
+      modelHint.textContent = $('provider').value === 'openai'
+        ? 'Aucun modele renvoye par ce serveur.'
+        : "Aucun modele installe. Fais 'ollama pull <modele>' dans un terminal.";
       modelHint.className = 'hint err';
       return;
     }
@@ -178,9 +192,15 @@ $('authorize').addEventListener('click', async () => {
 
 $('refresh').addEventListener('click', () => refreshModels(true));
 $('baseUrl').addEventListener('change', () => checkPermission());
+$('provider').addEventListener('change', () => {
+  updateBaseUrlLabel();
+  checkPermission();
+  refreshModels(false);
+});
 
 $('save').addEventListener('click', async () => {
   const settings = {
+    provider: $('provider').value,
     baseUrl: $('baseUrl').value.trim().replace(/\/$/, ''),
     model: $('model').value,
     language: $('language').value,

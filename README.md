@@ -54,10 +54,13 @@ Choisis un modèle avec de bonnes capacités d'instruction-following et de sorti
 
 Clique sur l'icône de l'extension dans la barre d'outils (ou l'engrenage du widget flottant) :
 
-1. Vérifie l'adresse du serveur (`http://localhost:11434` par défaut)
-2. Clique **Autoriser** pour donner à l'extension la permission Chrome d'appeler cette adresse
-3. Choisis un modèle dans la liste (rafraîchie automatiquement depuis `/api/tags`)
-4. Enregistre
+1. Choisis le **Fournisseur** : *Ollama* (par défaut) ou *Compatible OpenAI* (LM Studio, [FastFlowLM](https://github.com/FastFlowLM/FastFlowLM), vLLM, text-generation-webui, ou tout serveur exposant une API `/v1/chat/completions`)
+2. Vérifie l'adresse du serveur (`http://localhost:11434` par défaut pour Ollama ; pour un serveur compatible OpenAI, avec ou sans `/v1` à la fin, les deux fonctionnent)
+3. Clique **Autoriser** pour donner à l'extension la permission Chrome d'appeler cette adresse
+4. Choisis un modèle dans la liste (rafraîchie automatiquement)
+5. Enregistre
+
+Le mode *Compatible OpenAI* fonctionne avec n'importe quel serveur respectant ce format d'API standard — testé notamment avec [FastFlowLM](https://github.com/FastFlowLM/FastFlowLM) (inférence NPU sous Windows).
 
 ### Utilisation
 
@@ -163,10 +166,13 @@ Pick a model with decent instruction-following and JSON-output ability. Very sma
 
 Click the extension's toolbar icon (or the gear icon in the floating widget):
 
-1. Check the server address (`http://localhost:11434` by default)
-2. Click **Authorize** to grant the extension Chrome permission to call that address
-3. Pick a model from the list (auto-refreshed from `/api/tags`)
-4. Save
+1. Pick the **Provider**: *Ollama* (default) or *OpenAI-compatible* (LM Studio, [FastFlowLM](https://github.com/FastFlowLM/FastFlowLM), vLLM, text-generation-webui, or any server exposing a `/v1/chat/completions` API)
+2. Check the server address (`http://localhost:11434` by default for Ollama; for an OpenAI-compatible server, with or without a trailing `/v1`, both work)
+3. Click **Authorize** to grant the extension Chrome permission to call that address
+4. Pick a model from the list (auto-refreshed)
+5. Save
+
+The *OpenAI-compatible* mode works with any server following that standard API shape — tested with [FastFlowLM](https://github.com/FastFlowLM/FastFlowLM) (Windows NPU inference) among others.
 
 ### Usage
 

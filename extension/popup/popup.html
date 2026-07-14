@@ -22,7 +22,13 @@
     </div>
     <p class="hint" id="siteHint">Rafraichis la page apres avoir change ce reglage.</p>
 
-    <label>Adresse du serveur Ollama</label>
+    <label>Fournisseur</label>
+    <select id="provider">
+      <option value="ollama">Ollama</option>
+      <option value="openai">Compatible OpenAI (LM Studio, FastFlowLM, vLLM...)</option>
+    </select>
+
+    <label id="baseUrlLabel">Adresse du serveur Ollama</label>
     <div class="row">
       <input id="baseUrl" type="text" placeholder="http://localhost:11434" />
       <button id="authorize" class="secondary">Autoriser</button>
@@ -79,10 +85,11 @@
     </div>
 
     <details class="setup">
-      <summary>Ollama ne repond pas ? (CORS)</summary>
-      <p>Autorise cette extension a appeler ton serveur Ollama en definissant la variable d'environnement avant de lancer <code>ollama serve</code> :</p>
+      <summary>Le serveur ne repond pas ? (CORS)</summary>
+      <p><strong>Ollama :</strong> autorise cette extension en definissant la variable d'environnement avant de lancer <code>ollama serve</code> :</p>
       <pre>OLLAMA_ORIGINS=chrome-extension://* ollama serve</pre>
-      <p>Puis clique sur "Autoriser" ci-dessus et accepte la permission de navigation Chrome.</p>
+      <p><strong>Serveur compatible OpenAI (LM Studio, FastFlowLM, vLLM...) :</strong> verifie dans ses reglages/documentation qu'il autorise les requetes CORS depuis <code>chrome-extension://*</code>, ou depuis n'importe quelle origine si l'option existe.</p>
+      <p>Dans les deux cas, clique ensuite sur "Autoriser" ci-dessus et accepte la permission de navigation Chrome.</p>
     </details>
   </div>
   <script src="popup.js"></script>
