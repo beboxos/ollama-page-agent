@@ -566,8 +566,13 @@ ${ACTION_SCHEMA_DOC}${visionControl ? VISION_ACTION_SCHEMA_DOC : ''}${customBloc
               ? `Action visuelle a (${action.x}, ${action.y})`
             : 'Valider ou envoyer le contenu saisi';
           if (label) {
+            // Visual/coordinate clicks have no DOM to cross-check against
+            // (that's the whole "double verification DOM + vision" idea),
+            // so they always require a human's OK - never skipped by auto
+            // mode or "always for this page".
+            const forceConfirm = VISUAL_TYPES.has(action.type);
             const confirmed = onConfirmAction
-              ? await onConfirmAction(label, lines[action.index])
+              ? await onConfirmAction(label, lines[action.index], { force: forceConfirm })
               : true;
             if (stopped) return;
             if (!confirmed) {

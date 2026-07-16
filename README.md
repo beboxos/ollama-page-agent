@@ -84,6 +84,8 @@ Le réglage **Pilotage visuel** est destiné aux interfaces canvas ou sans DOM e
 
 Ce mode est moins fiable que le DOM : les clics visuels sont sensibles à la résolution, à la mise en page et aux estimations du modèle. L'extension bloque les coordonnées invalides et les répétitions immédiates du même clic. Certains clients Web ignorent par ailleurs les événements synthétiques du navigateur : teste toujours sur une action sans risque. Le **mode lecture seule** bloque volontairement toute action visuelle.
 
+Un clic ou une saisie visuelle n'a aucun DOM auquel se raccrocher pour se vérifier — c'est le scénario le plus à risque de "cliquer sur n'importe quoi". Ces actions demandent donc **toujours** une confirmation manuelle, même en mode "Ne jamais demander (auto)" ou après avoir choisi "Toujours (cette page)" : le garde-fou ne peut pas être contourné pour ce type d'action.
+
 ### Mode lecture seule et confirmation avant une action sensible
 
 Le réglage **Mode lecture seule** autorise l'observation, le défilement, la lecture et les réponses, mais bloque techniquement les clics, saisies, sélections, touches clavier et actions visuelles. Il est adapté aux audits, résumés et propositions de réponse.
@@ -214,6 +216,8 @@ You can capture at every step (more reliable) or only at the first step (faster 
 **Visual control** targets canvas or DOM-less interfaces, such as some browser-based remote-control clients. It uses one full-screen image as the sole reference (without DOM, history or coordinate-confusing crops) and lets the model propose `click_visual` or `type_visual` actions with viewport `x` / `y` coordinates.
 
 This is less reliable than DOM control. Invalid coordinates and immediate repeats of the same visual click are blocked. Some web clients ignore synthetic browser events, so test only harmless actions first. **Read-only mode** deliberately blocks every visual action.
+
+A visual click or type has no DOM to cross-check against — the riskiest scenario for "clicking on just anything." These actions therefore always require manual confirmation, even with "Never ask (auto)" or after choosing "Always (this page)": this safeguard cannot be bypassed for this action type.
 
 ### Read-only mode and confirmation before a sensitive action
 
