@@ -46,11 +46,17 @@
     return stored[historyKey()] || [];
   }
 
-  async function appendHistory(entry) {
+  async function appendHistory(entry, retention = 'manual') {
+    if (retention === 'off') return;
     const list = await loadHistory();
-    list.push(entry);
-    while (list.length > HISTORY_MAX) list.shift();
-    await chrome.storage.local.set({ [historyKey()]: list });
+    const now = Date.now();
+    const maxAge = Number.parseInt(retention, 10);
+    const retained = Number.isFinite(maxAge)
+      ? list.filter((item) => item.createdAt && now - item.createdAt <= maxAge * 24 * 60 * 60 * 1000)
+      : list;
+    retained.push({ ...entry, createdAt: now });
+    while (retained.length > HISTORY_MAX) retained.shift();
+    await chrome.storage.local.set({ [historyKey()]: retained });
   }
 
   async function clearHistory() {
@@ -75,6 +81,8 @@
       case 'press_key': return `Touche: ${action.key}`;
       case 'wait': return `Attente ${action.ms || 0} ms`;
       case 'read_text': return 'Lecture du texte principal de la page';
+      case 'click_visual': return `Clic visuel -> (${action.x}, ${action.y})`;
+      case 'type_visual': return `Saisie visuelle -> (${action.x}, ${action.y})`;
       default: return action.type;
     }
   }
@@ -120,7 +128,7 @@
           goal,
           success,
           message: (message || '').slice(0, 200),
-        }).catch(() => {});
+        }, settings.historyRetention).catch(() => {});
       },
       onAskUser(question) {
         PA.widget.log('action', `❓ ${question}`);
@@ -137,8 +145,8 @@
       onPersist(state) {
         sendMsg({ type: 'SET_SESSION', session: { running: true, goal, ...state } }).catch(() => {});
       },
-      async onConfirmAction(label, detail) {
-        if (settings.sensitiveActionMode === 'auto' || autoApproveSensitive) return true;
+      async onConfirmAction(label, detail, { force = false } = {}) {
+        if (!force && (settings.sensitiveActionMode === 'auto' || autoApproveSensitive)) return true;
         PA.widget.setStatus('idle');
         const choice = await PA.widget.confirmAction(label, detail);
         PA.widget.setStatus('running');
@@ -147,7 +155,9 @@
       },
     });
 
-    const historyBlock = resumeState ? '' : formatHistoryForPrompt(await loadHistory());
+    // A visual-control task must not inherit textual context that makes the
+    // model believe a canvas-like interface exposes a useful DOM.
+    const historyBlock = (resumeState || settings.visionControl) ? '' : formatHistoryForPrompt(await loadHistory());
     controller.run(goal, settings, resumeState, historyBlock).catch((e) => {
       PA.widget.log('error', 'Erreur inattendue: ' + friendlyError(e));
       PA.widget.setRunning(false);

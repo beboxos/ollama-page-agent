@@ -68,12 +68,52 @@
     </div>
     <p class="hint" id="visionHint"></p>
 
+    <label>Frequence Vision</label>
+    <select id="visionFrequency">
+      <option value="each_step">A chaque etape</option>
+      <option value="first_step">Seulement a la premiere etape</option>
+    </select>
+    <p class="hint">La premiere option est plus fiable ; la seconde reduit les donnees et le temps de traitement.</p>
+
+    <div class="site-toggle-row">
+      <div>
+        <div class="site-toggle-label">Pilotage visuel (beta)</div>
+        <div class="hint" style="margin-top:2px;">Pour les interfaces canvas sans DOM (ex. TeamViewer Web) : envoie uniquement les images et autorise les clics par coordonnees. Les confirmations suivent le reglage ci-dessous.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="visionControl" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="site-toggle-row">
+      <div>
+        <div class="site-toggle-label">Mode lecture seule</div>
+        <div class="hint" style="margin-top:2px;">L'agent peut lire et defiler, mais ne peut ni cliquer, ni saisir, ni valider.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="readOnly" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
     <label>Confirmation avant une action sensible</label>
     <select id="sensitiveActionMode">
       <option value="ask">Toujours demander (recommande)</option>
       <option value="auto">Ne jamais demander (auto)</option>
     </select>
     <p class="hint">En mode "Toujours demander", le prompt de confirmation propose aussi "Toujours pour cette page" pour ne plus etre redemande le temps de la page en cours.</p>
+
+    <label>Conservation de l'historique</label>
+    <select id="historyRetention">
+      <option value="off">Ne pas conserver</option>
+      <option value="1">1 jour</option>
+      <option value="7">7 jours</option>
+      <option value="manual">Jusqu'a suppression manuelle</option>
+    </select>
+    <div class="row" style="margin-top:6px;">
+      <button id="clearAllHistory" class="secondary">Effacer tous les historiques</button>
+    </div>
 
     <label>Instructions personnalisees (optionnel)</label>
     <textarea id="customInstructions" rows="4" placeholder="Ex: tutoie-moi, reponds avec humour, evite de cliquer sur les liens sponsorises..."></textarea>

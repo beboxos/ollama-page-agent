@@ -60,7 +60,7 @@ Clique sur l'icône de l'extension dans la barre d'outils (ou l'engrenage du wid
 4. Choisis un modèle dans la liste (rafraîchie automatiquement)
 5. Enregistre
 
-Le mode *Compatible OpenAI* fonctionne avec n'importe quel serveur respectant ce format d'API standard — testé notamment avec [FastFlowLM](https://github.com/FastFlowLM/FastFlowLM) (inférence NPU sous Windows).
+Le mode *Compatible OpenAI* fonctionne avec n'importe quel serveur respectant ce format d'API standard — testé notamment avec [FastFlowLM](https://github.com/FastFlowLM/FastFlowLM) (inférence NPU sous Windows). Si un serveur local refuse le champ optionnel `response_format`, l'extension relance automatiquement la requête sans ce champ et conserve sa validation JSON locale.
 
 ### Utilisation
 
@@ -74,15 +74,29 @@ Le widget ne s'affiche jamais à l'impression (`@media print`). Pour le désacti
 
 ### Vision (modèles multimodaux)
 
-Si tu utilises un modèle Ollama multimodal (ex : `gemma3`, `llava`, `qwen2-vl`), tu peux activer l'option **"Vision"** dans les réglages : une capture d'écran de la zone visible est alors envoyée en complément du texte à chaque étape, pour aider le modèle à mieux comprendre des mises en page ambiguës. Ça reste purement informatif — les actions se font toujours par index `[N]`, jamais par coordonnées.
+Avec **Vision**, l'extension envoie une capture de la zone visible en complément du DOM. C'est un mode **hybride** : le modèle repère d'abord l'élément par son index `[N]`, puis utilise l'image pour vérifier son libellé, son emplacement et son contexte avant d'agir. Il ne doit pas cliquer si le DOM et l'image se contredisent. Une image importante intégrée à la page peut aussi être envoyée sous la forme d'un agrandissement séparé, afin de rester lisible par le modèle.
 
-Cette option est **désactivée par défaut** : sans elle, tout fonctionne exactement comme avant (texte seul), y compris avec des modèles non multimodaux. L'activer nécessite d'autoriser la capture d'écran sur tous les sites (bouton dédié dans les réglages) — permission plus large que le strict nécessaire pour le reste de l'extension, à activer uniquement si tu comptes t'en servir.
+La fréquence est réglable : capture à chaque étape (plus fiable) ou seulement à la première étape (plus rapide et plus sobre). Les captures ne sont pas enregistrées par l'extension : elles existent en mémoire pendant l'appel puis sont envoyées uniquement au serveur configuré.
 
-### Confirmation avant une action sensible
+#### Pilotage visuel (bêta)
 
-Avant tout **clic** sur un élément dont le libellé contient un mot-clé jugé sensible (publier, tweeter, envoyer, répondre, payer, acheter, commander, confirmer, valider, supprimer, se désabonner, ...), l'agent s'arrête et affiche une demande de confirmation dans le panneau (**Confirmer** / **Toujours (cette page)** / **Annuler**) au lieu d'exécuter le clic directement. Si tu annules, l'agent en est informé et doit trouver une autre approche ou conclure. Cette détection se fait par mots-clés sur le texte visible du bouton : elle est volontairement large (elle peut se déclencher sur un simple bandeau de cookies) plutôt que de risquer de laisser passer une vraie action irréversible (publication publique, achat, suppression).
+Le réglage **Pilotage visuel** est destiné aux interfaces canvas ou sans DOM exploitable, par exemple certains clients de prise en main à distance dans le navigateur. Dans ce mode, seul un écran complet sert de référence (sans DOM, historique ni recadrage qui brouillerait les coordonnées) et le modèle peut proposer `click_visual` ou `type_visual` avec des coordonnées `x` / `y` dans le viewport.
+
+Ce mode est moins fiable que le DOM : les clics visuels sont sensibles à la résolution, à la mise en page et aux estimations du modèle. L'extension bloque les coordonnées invalides et les répétitions immédiates du même clic. Certains clients Web ignorent par ailleurs les événements synthétiques du navigateur : teste toujours sur une action sans risque. Le **mode lecture seule** bloque volontairement toute action visuelle.
+
+### Mode lecture seule et confirmation avant une action sensible
+
+Le réglage **Mode lecture seule** autorise l'observation, le défilement, la lecture et les réponses, mais bloque techniquement les clics, saisies, sélections, touches clavier et actions visuelles. Il est adapté aux audits, résumés et propositions de réponse.
+
+Même sans activer ce réglage, une demande qui consiste uniquement à *proposer*, *rédiger*, *formuler* ou *préparer* une réponse est traitée comme un objectif de brouillon : l'extension bloque les clics et saisies tant que l'objectif ne demande pas explicitement d'envoyer, publier, valider ou cliquer.
+
+Avant tout **clic** sur un élément dont le libellé contient un mot-clé jugé sensible (publier, tweeter, envoyer, répondre, payer, acheter, commander, confirmer, valider, supprimer, se désabonner, ...), ou avant une validation par touche Entrée après saisie, l'agent affiche une demande de confirmation (**Confirmer** / **Toujours (cette page)** / **Annuler**). Si tu annules, l'agent en est informé et doit trouver une autre approche ou conclure.
 
 **Toujours (cette page)** arrête de redemander pour le reste de la page en cours (remis à zéro au prochain chargement de page). Dans les réglages, le mode **"Confirmation avant une action sensible"** peut aussi être basculé sur **"Ne jamais demander (auto)"** pour désactiver complètement ce garde-fou — à réserver à un usage encadré, puisque ça retire la protection contre les actions irréversibles.
+
+### Historique et confidentialité
+
+L'historique local par site est réglable : désactivé, 1 jour, 7 jours ou conservation manuelle. Un bouton des réglages efface tous les historiques de tâches. Les paramètres et l'historique restent dans `chrome.storage.local` ; les captures Vision ne sont jamais ajoutées à cet historique.
 
 ### Instructions personnalisées
 
@@ -99,7 +113,7 @@ extension/
     pointer.js              # curseur visuel + surlignage + ripple de clic
     widget.js                # panneau de chat flottant (shadow DOM), historique
     agent_loop.js           # boucle ReAct: prompt -> JSON action -> execution, anti-boucle
-    frame_bridge.js         # fusionne/route les elements entre cadre principal et iframes
+    frame_bridge.js         # route les iframes via chrome.runtime/frameId (pas de postMessage de page)
     content.js               # colle le tout, gere session + historique par site
   popup/                     # reglages (aussi utilise comme page d'options)
 ```
@@ -109,6 +123,11 @@ extension/
 - Dépend fortement de la capacité du modèle local à répondre en JSON valide et à raisonner sur des listes d'éléments ; préfère des modèles 7B+ instruct.
 - Ne fonctionne pas sur `chrome://`, les pages du Web Store, ni les fichiers locaux `file://`.
 - Un site avec une CSP très stricte peut bloquer certaines interactions synthétiques (rare).
+- Le pilotage visuel bêta est moins précis que les index DOM et peut être ignoré par les applications qui exigent des événements utilisateur de confiance.
+
+### Tests
+
+Sans dépendance externe : `npm test`. Les tests vérifient notamment la conversion d'images vers le format `image_url` OpenAI et le repli sans `response_format`.
 
 ### Licence
 
@@ -172,7 +191,7 @@ Click the extension's toolbar icon (or the gear icon in the floating widget):
 4. Pick a model from the list (auto-refreshed)
 5. Save
 
-The *OpenAI-compatible* mode works with any server following that standard API shape — tested with [FastFlowLM](https://github.com/FastFlowLM/FastFlowLM) (Windows NPU inference) among others.
+The *OpenAI-compatible* mode works with any server following that standard API shape — tested with [FastFlowLM](https://github.com/FastFlowLM/FastFlowLM) (Windows NPU inference) among others. If a local server rejects the optional `response_format` field, the extension automatically retries without it while keeping local JSON validation.
 
 ### Usage
 
@@ -186,13 +205,23 @@ The widget never shows up when printing (`@media print`). To turn it off entirel
 
 ### Vision (multimodal models)
 
-If you're running a multimodal Ollama model (e.g. `gemma3`, `llava`, `qwen2-vl`), you can enable **"Vision"** in settings: a screenshot of the visible area is then sent alongside the text on every step, to help the model make sense of ambiguous layouts. It's purely informational — actions still always go through `[N]` indices, never coordinates.
+**Vision** sends a screenshot alongside the DOM. It is a **hybrid** mode: the model first identifies an element through its `[N]` index, then checks its label, position and context in the image before acting. It must not click when the DOM and image disagree. An important image embedded in the page can also be sent as a separate enlargement so it remains readable.
 
-This option is **off by default**: without it, everything works exactly as before (text only), including with non-multimodal models. Turning it on requires authorizing screenshot capture on all sites (dedicated button in settings) — a broader permission than the rest of the extension strictly needs, so only grant it if you actually plan to use this feature.
+You can capture at every step (more reliable) or only at the first step (faster and lighter). Screenshots are not written to disk or extension storage: they are held in memory for the request and sent only to the configured server.
 
-### Confirmation before a sensitive action
+#### Visual control (beta)
 
-Before any **click** on an element whose label contains a keyword considered sensitive (publish, tweet, send, reply, pay, buy, order, confirm, submit, delete, unsubscribe, ...), the agent stops and shows a confirmation prompt in the panel (**Confirm** / **Always (this page)** / **Cancel**) instead of executing the click directly. If you cancel, the agent is told and must find another approach or wrap up. This is a keyword-based heuristic on the button's visible text — deliberately broad (it can trigger on a plain cookie banner) rather than risk missing a real irreversible action (public post, purchase, deletion).
+**Visual control** targets canvas or DOM-less interfaces, such as some browser-based remote-control clients. It uses one full-screen image as the sole reference (without DOM, history or coordinate-confusing crops) and lets the model propose `click_visual` or `type_visual` actions with viewport `x` / `y` coordinates.
+
+This is less reliable than DOM control. Invalid coordinates and immediate repeats of the same visual click are blocked. Some web clients ignore synthetic browser events, so test only harmless actions first. **Read-only mode** deliberately blocks every visual action.
+
+### Read-only mode and confirmation before a sensitive action
+
+**Read-only mode** allows observation, scrolling, reading and answers, but technically blocks clicks, typing, selections, keyboard keys and visual actions. It is intended for audits, summaries and response drafts.
+
+Even without read-only mode, a goal that only asks to *suggest*, *draft*, *formulate* or *prepare* a reply is treated as a draft-only goal: the extension blocks clicks and typing unless the goal explicitly asks to send, publish, submit, validate or click.
+
+Before any **click** whose label contains a sensitive keyword (publish, tweet, send, reply, pay, buy, order, confirm, submit, delete, unsubscribe, ...) — or before pressing Enter after typing — the agent shows a confirmation prompt (**Confirm** / **Always (this page)** / **Cancel**).
 
 **Always (this page)** stops asking for the rest of the current page (reset on the next page load). In settings, the **"Confirmation before a sensitive action"** mode can also be switched to **"Never ask (auto)"** to disable this safeguard entirely — reserve that for a supervised setup, since it removes the protection against irreversible actions.
 
@@ -211,7 +240,7 @@ extension/
     pointer.js              # visual cursor + highlight + click ripple
     widget.js                # floating chat panel (shadow DOM), history
     agent_loop.js           # ReAct loop: prompt -> JSON action -> execution, loop guard
-    frame_bridge.js         # merges/routes elements between the top frame and iframes
+    frame_bridge.js         # routes iframe work through chrome.runtime/frameId (not page postMessage)
     content.js               # wires it all together, session + per-site history
   popup/                     # settings (also used as the options page)
 ```
@@ -221,6 +250,11 @@ extension/
 - Heavily depends on the local model's ability to reply with valid JSON and reason over element lists; prefer 7B+ instruct models.
 - Doesn't work on `chrome://` pages, the Web Store, or local `file://` files.
 - A site with a very strict CSP may block some synthetic interactions (rare).
+- Visual-control beta is less precise than DOM indices and can be ignored by applications requiring trusted user events.
+
+### Tests
+
+No external dependency: run `npm test`. Tests cover OpenAI `image_url` conversion and the retry path without `response_format`.
 
 ### License
 

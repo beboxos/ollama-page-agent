@@ -85,7 +85,11 @@ async function loadSettings() {
   $('language').value = settings.language;
   $('maxSteps').value = settings.maxSteps;
   $('visionEnabled').checked = !!settings.useVision;
+  $('visionFrequency').value = settings.visionFrequency || 'each_step';
+  $('visionControl').checked = !!settings.visionControl;
+  $('readOnly').checked = !!settings.readOnly;
   $('sensitiveActionMode').value = settings.sensitiveActionMode || 'ask';
+  $('historyRetention').value = settings.historyRetention || 'manual';
   $('customInstructions').value = settings.customInstructions || '';
   if (settings.model) {
     const opt = document.createElement('option');
@@ -125,6 +129,20 @@ $('visionEnabled').addEventListener('change', async (e) => {
   if (!granted) {
     e.target.checked = false;
   }
+});
+
+$('visionControl').addEventListener('change', async (e) => {
+  if (!e.target.checked) return;
+  const granted = await checkVisionPermission();
+  if (!granted) e.target.checked = false;
+});
+
+$('clearAllHistory').addEventListener('click', async () => {
+  if (!confirm('Effacer tous les historiques de taches enregistres par l’extension ?')) return;
+  const res = await sendMsg({ type: 'CLEAR_ALL_HISTORY' });
+  const status = $('saveStatus');
+  status.textContent = res?.ok ? 'Historiques effaces.' : (res?.error || 'Erreur lors de la suppression.');
+  status.className = 'hint ' + (res?.ok ? 'ok' : 'err');
 });
 
 async function checkPermission() {
@@ -206,8 +224,12 @@ $('save').addEventListener('click', async () => {
     language: $('language').value,
     maxSteps: Math.max(1, Math.min(60, parseInt($('maxSteps').value, 10) || 20)),
     useVision: $('visionEnabled').checked,
+    visionFrequency: $('visionFrequency').value,
+    visionControl: $('visionControl').checked,
+    readOnly: $('readOnly').checked,
     customInstructions: $('customInstructions').value.trim(),
     sensitiveActionMode: $('sensitiveActionMode').value,
+    historyRetention: $('historyRetention').value,
   };
   await sendMsg({ type: 'SET_SETTINGS', settings });
   const status = $('saveStatus');

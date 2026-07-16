@@ -12,6 +12,10 @@ const DEFAULT_SETTINGS = {
   useVision: false,
   customInstructions: '',
   sensitiveActionMode: 'ask', // 'ask' | 'auto'
+  readOnly: false,
+  visionFrequency: 'each_step', // 'each_step' | 'first_step'
+  visionControl: false, // screenshot-only context + coordinate actions (beta)
+  historyRetention: 'manual', // 'off' | '1' | '7' | 'manual'
 };
 
 async function getSettings() {
@@ -76,9 +80,32 @@ async function apiFetch(baseUrl, path, options, serverLabel) {
     const text = await res.text().catch(() => '');
     const err = new Error(`${serverLabel} a repondu ${res.status}: ${text.slice(0, 300)}`);
     err.code = 'HTTP_ERROR';
+    err.status = res.status;
     throw err;
   }
   return res.json();
+}
+
+function getAllFrames(tabId) {
+  return new Promise((resolve) => {
+    chrome.webNavigation.getAllFrames({ tabId }, (frames) => {
+      if (chrome.runtime.lastError) return resolve([]);
+      resolve(frames || []);
+    });
+  });
+}
+
+function sendToFrame(tabId, frameId, message) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, message, { frameId }, (response) => {
+      if (chrome.runtime.lastError) return resolve(null);
+      resolve(response || null);
+    });
+  });
+}
+
+function frameLabel(url) {
+  try { return new URL(url).hostname; } catch { return 'iframe'; }
 }
 
 // Normalizes to ".../v1" regardless of whether the user already typed the
@@ -117,24 +144,38 @@ function toOpenAiMessages(messages) {
 }
 
 async function chat({ baseUrl, model, messages, temperature, provider }) {
+  const imageCount = messages.reduce((count, message) => count + (message.images?.length || 0), 0);
+  // Metadata only: never log a screenshot, but make vision requests diagnosable
+  // from the extension service-worker console.
+  console.info('[Ollama Page Agent] chat request', { provider, model, messageCount: messages.length, imageCount });
   if (provider === 'openai') {
-    const data = await apiFetch(
-      toV1Base(baseUrl),
-      '/chat/completions',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages: toOpenAiMessages(messages),
-          stream: false,
-          response_format: { type: 'json_object' },
-          temperature: temperature ?? 0.2,
-        }),
-      },
-      'le serveur'
-    );
-    return data.choices?.[0]?.message?.content ?? '';
+    const payload = {
+      model,
+      messages: toOpenAiMessages(messages),
+      stream: false,
+      response_format: { type: 'json_object' },
+      temperature: temperature ?? 0.2,
+    };
+    let data;
+    try {
+      data = await apiFetch(
+        toV1Base(baseUrl), '/chat/completions',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+        'le serveur'
+      );
+    } catch (error) {
+      // A few otherwise-compatible local servers do not implement the
+      // optional response_format field. The agent still validates JSON itself.
+      if (error.code !== 'HTTP_ERROR' || ![400, 404, 422].includes(error.status)) throw error;
+      delete payload.response_format;
+      console.info('[Ollama Page Agent] retrying without response_format');
+      data = await apiFetch(
+        toV1Base(baseUrl), '/chat/completions',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+        'le serveur'
+      );
+    }
+    return { content: data.choices?.[0]?.message?.content ?? '', imageCount };
   }
   const data = await apiFetch(
     baseUrl,
@@ -152,7 +193,7 @@ async function chat({ baseUrl, model, messages, temperature, provider }) {
     },
     'Ollama'
   );
-  return data.message?.content ?? '';
+  return { content: data.message?.content ?? '', imageCount };
 }
 
 async function captureScreenshot(tab) {
@@ -187,6 +228,13 @@ async function clearSession(tabId) {
   await chrome.storage.session.remove(key);
 }
 
+async function clearAllHistory() {
+  const stored = await chrome.storage.local.get(null);
+  const keys = Object.keys(stored).filter((key) => key.startsWith('pa_history_'));
+  if (keys.length) await chrome.storage.local.remove(keys);
+  return keys.length;
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
@@ -204,6 +252,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case 'CLEAR_SESSION': {
           if (tabId != null) await clearSession(tabId);
           sendResponse({ ok: true });
+          break;
+        }
+        case 'CLEAR_ALL_HISTORY': {
+          const count = await clearAllHistory();
+          sendResponse({ ok: true, count });
           break;
         }
         case 'GET_SETTINGS': {
@@ -233,6 +286,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse({ ok: true, dataUrl });
           break;
         }
+        case 'FRAME_COLLECT': {
+          // Only the top-frame controller may enumerate iframe content.
+          if (tabId == null || sender.frameId !== 0) {
+            sendResponse({ ok: false, error: 'Requete iframe non autorisee.' });
+            break;
+          }
+          const frames = (await getAllFrames(tabId)).filter((frame) => frame.frameId !== 0);
+          const snapshots = await Promise.all(frames.map(async (frame) => {
+            const response = await sendToFrame(tabId, frame.frameId, { type: 'PA_FRAME_SERIALIZE' });
+            return response?.ok ? { frameId: frame.frameId, label: frameLabel(frame.url), lines: response.lines } : null;
+          }));
+          sendResponse({ ok: true, frames: snapshots.filter(Boolean) });
+          break;
+        }
+        case 'FRAME_EXECUTE': {
+          if (tabId == null || sender.frameId !== 0 || !Number.isInteger(msg.frameId) || msg.frameId === 0) {
+            sendResponse({ ok: false, error: 'Execution iframe non autorisee.' });
+            break;
+          }
+          const frames = await getAllFrames(tabId);
+          if (!frames.some((frame) => frame.frameId === msg.frameId)) {
+            sendResponse({ ok: false, error: 'Iframe cible introuvable.' });
+            break;
+          }
+          const response = await sendToFrame(tabId, msg.frameId, { type: 'PA_FRAME_EXECUTE', action: msg.action });
+          sendResponse(response || { ok: false, error: "L'iframe n'a pas repondu." });
+          break;
+        }
         case 'CHAT': {
           const settings = await getSettings();
           const content = await chat({
@@ -240,9 +321,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             model: msg.model || settings.model,
             messages: msg.messages,
             temperature: settings.temperature,
-            provider: settings.provider,
+            provider: msg.provider || settings.provider,
           });
-          sendResponse({ ok: true, content });
+          sendResponse({ ok: true, content: content.content, imageCount: content.imageCount });
           break;
         }
         default:
